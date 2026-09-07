@@ -54,7 +54,7 @@ class UserService {
       }).toList();
     } catch (e) {
       debugPrint('UserService.getUsers error: $e');
-      throw 'Unable to load contacts. Please check your connection and try again.';
+      throw mapFirestoreError(e);
     }
   }
 
@@ -83,7 +83,26 @@ class UserService {
       await _usersCollection.doc(uid).update(data);
     } catch (e) {
       debugPrint('UserService.updateUserProfile error: $e');
-      throw 'Unable to update profile. Please try again.';
+      throw mapFirestoreError(e);
     }
+  }
+
+  // Map Firebase Firestore exceptions to friendly, actionable messages
+  static String mapFirestoreError(dynamic error) {
+    if (error is FirebaseException) {
+      final message = error.message ?? '';
+      if (error.code == 'permission-denied') {
+        if (message.contains('Cloud Firestore API') ||
+            message.contains('disabled') ||
+            message.contains('not been used')) {
+          return 'Cloud Firestore is disabled in Firebase Console. Please enable Firestore Database in your Firebase project.';
+        }
+        return 'Access denied. Please check your Firestore security rules.';
+      } else if (error.code == 'unavailable') {
+        return 'Database temporarily unavailable. Please check your internet connection.';
+      }
+      return message.isNotEmpty ? message : 'A database error occurred.';
+    }
+    return error.toString();
   }
 }
