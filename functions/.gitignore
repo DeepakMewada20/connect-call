@@ -1,0 +1,15 @@
+# Compiled JavaScript
+lib/
+node_modules/
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+.secret.local
+
+# Firebase logs
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log

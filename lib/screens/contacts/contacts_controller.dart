@@ -4,18 +4,24 @@ import '../../core/theme/app_theme.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
+import '../../services/zego_call_service.dart';
 
 class ContactsController extends GetxController {
   final UserService _userService;
   final AuthService _authService;
+  final ZegoCallService? zegoCallService;
   final String? currentUserIdOverride;
 
   ContactsController({
     UserService? userService,
     AuthService? authService,
+    this.zegoCallService,
     this.currentUserIdOverride,
   })  : _userService = userService ?? UserService(),
         _authService = authService ?? AuthService();
+
+  ZegoCallService get activeCallService =>
+      zegoCallService ?? ZegoCallService.instance;
 
   // Reactive state
   final RxList<UserModel> users = <UserModel>[].obs;
@@ -86,24 +92,16 @@ class ContactsController extends GetxController {
     }).toList();
   }
 
-  // Audio call placeholder feedback
-  void onAudioCallTap(UserModel user) {
-    Get.snackbar(
-      'Audio Call',
-      'Audio calling will be available soon.',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppTheme.primaryColor,
-      colorText: Colors.white,
-      margin: const EdgeInsets.all(16),
-      duration: const Duration(seconds: 3),
-    );
+  // Audio call action: initiates real 1-to-1 audio call via ZegoCallService
+  Future<void> onAudioCallTap(UserModel user) async {
+    await activeCallService.sendAudioCallInvitation(targetUser: user);
   }
 
-  // Video call placeholder feedback
+  // Video call action: placeholder for Phase 7
   void onVideoCallTap(UserModel user) {
     Get.snackbar(
       'Video Call',
-      'Video calling will be available soon.',
+      'Video calling will be available in Phase 7. Use the green audio call button for voice calls.',
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: AppTheme.primaryColor,
       colorText: Colors.white,

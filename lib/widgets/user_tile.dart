@@ -112,16 +112,18 @@ class UserTile extends StatelessWidget {
             // Call Action Buttons
             _buildActionButton(
               icon: Icons.call_rounded,
-              tooltip: 'Audio Call',
+              tooltip: 'Start Audio Call',
               color: const Color(0xFF10B981),
               onTap: onAudioCall,
+              isEnabled: true,
             ),
             const SizedBox(width: 6),
             _buildActionButton(
               icon: Icons.videocam_rounded,
-              tooltip: 'Video Call',
+              tooltip: 'Video Call (Coming in Phase 7)',
               color: AppTheme.primaryColor,
               onTap: onVideoCall,
+              isEnabled: false,
             ),
           ],
         ),
@@ -180,21 +182,27 @@ class UserTile extends StatelessWidget {
     required String tooltip,
     required Color color,
     required VoidCallback onTap,
+    bool isEnabled = true,
   }) {
-    return Material(
-      color: color.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: onTap,
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: isEnabled
+            ? color.withValues(alpha: 0.1)
+            : Colors.grey.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        child: Container(
-          width: 38,
-          height: 38,
-          alignment: Alignment.center,
-          child: Icon(
-            icon,
-            size: 20,
-            color: color,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            child: Icon(
+              icon,
+              size: 20,
+              color: isEnabled ? color : Colors.grey.shade400,
+            ),
           ),
         ),
       ),

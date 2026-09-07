@@ -5,6 +5,7 @@ import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'routes/app_pages.dart';
+import 'services/zego_call_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,7 @@ class ConnectCallApp extends StatelessWidget {
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      navigatorKey: ZegoCallService.navigatorKey,
       initialRoute: AppPages.initial,
       getPages: AppPages.pages,
     );

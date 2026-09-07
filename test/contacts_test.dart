@@ -407,7 +407,7 @@ void main() {
       // Tap Audio Call button
       await tester.tap(find.byIcon(Icons.call_rounded));
       await tester.pump();
-      expect(find.text('Audio calling will be available soon.'), findsOneWidget);
+      expect(find.byIcon(Icons.call_rounded), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
@@ -415,7 +415,10 @@ void main() {
       // Tap Video Call button
       await tester.tap(find.byIcon(Icons.videocam_rounded));
       await tester.pump();
-      expect(find.text('Video calling will be available soon.'), findsOneWidget);
+      expect(
+          find.text(
+              'Video calling will be available in Phase 7. Use the green audio call button for voice calls.'),
+          findsOneWidget);
 
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();

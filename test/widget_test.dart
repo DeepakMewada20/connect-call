@@ -186,7 +186,9 @@ void main() {
     // Tap Audio Call quick action to verify no crash and friendly feedback
     await tester.tap(find.text('Audio Call'));
     await tester.pump();
-    expect(find.text('Audio calling will be available soon in Phase 4.'),
+    expect(
+        find.text(
+            'Select any contact from the Contacts tab to start a 1-to-1 audio call.'),
         findsOneWidget);
 
     // Wait for snackbar to finish

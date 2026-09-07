@@ -5,18 +5,24 @@ import '../../models/user_model.dart';
 import '../../routes/app_routes.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
+import '../../services/zego_call_service.dart';
 
 class ProfileController extends GetxController {
   final UserService _userService;
   final AuthService _authService;
+  final ZegoCallService? zegoCallService;
   final String? currentUserIdOverride;
 
   ProfileController({
     UserService? userService,
     AuthService? authService,
+    this.zegoCallService,
     this.currentUserIdOverride,
   })  : _userService = userService ?? UserService(),
         _authService = authService ?? AuthService();
+
+  ZegoCallService get activeCallService =>
+      zegoCallService ?? ZegoCallService.instance;
 
   // Reactive state
   final Rxn<UserModel> user = Rxn<UserModel>();
@@ -114,6 +120,10 @@ class ProfileController extends GetxController {
   Future<void> logout() async {
     isLoggingOut.value = true;
     try {
+      // Deinitialize ZEGOCLOUD CallKit first
+      if (!Get.testMode) {
+        await activeCallService.uninit();
+      }
       await _authService.logout();
       Get.offAllNamed(AppRoutes.login);
     } catch (e) {
