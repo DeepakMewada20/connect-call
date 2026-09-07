@@ -44,6 +44,16 @@ class AuthService {
     }
   }
 
+  // Get current user UID safely
+  String? get currentUserId {
+    try {
+      return _instance.currentUser?.uid;
+    } catch (e) {
+      debugPrint('AuthService.currentUserId error: $e');
+      return null;
+    }
+  }
+
   // Register with email and password
   Future<UserCredential> register({
     required String email,

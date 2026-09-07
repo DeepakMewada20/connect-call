@@ -202,10 +202,8 @@ void main() {
     // Tap Contacts Tab
     await tester.tap(find.text('Contacts'));
     await tester.pumpAndSettle();
-    expect(
-        find.text(
-            'User directory and search will be available soon in Phase 4.'),
-        findsOneWidget);
+    expect(find.text('Connect with people'), findsOneWidget);
+    expect(find.text('Search contacts...'), findsOneWidget);
 
     // Tap Calls Tab
     await tester.tap(find.text('Calls'));

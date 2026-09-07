@@ -45,6 +45,19 @@ class UserService {
     }
   }
 
+  // Retrieve all user documents from the users collection
+  Future<List<UserModel>> getUsers() async {
+    try {
+      final snapshot = await _usersCollection.get();
+      return snapshot.docs.map((doc) {
+        return UserModel.fromMap(doc.data(), documentId: doc.id);
+      }).toList();
+    } catch (e) {
+      debugPrint('UserService.getUsers error: $e');
+      throw 'Unable to load contacts. Please check your connection and try again.';
+    }
+  }
+
   // Update user online status
   Future<void> updateOnlineStatus(String uid, bool isOnline) async {
     try {
