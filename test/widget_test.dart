@@ -164,4 +164,63 @@ void main() {
     expect(Get.currentRoute, AppRoutes.home);
     expect(find.byType(HomeScreen), findsOneWidget);
   });
+
+  testWidgets(
+      'Home screen renders dashboard and switches bottom navigation tabs',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.home,
+        getPages: AppPages.pages,
+      ),
+    );
+
+    // Initial Dashboard Tab
+    expect(find.text('Ready to connect?'), findsOneWidget);
+    expect(find.text('Quick Actions'), findsOneWidget);
+    expect(find.text('Audio Call'), findsOneWidget);
+    expect(find.text('Video Call'), findsOneWidget);
+    expect(find.text('Recent Calls'), findsOneWidget);
+    expect(find.text('No recent calls'), findsOneWidget);
+
+    // Tap Audio Call quick action to verify no crash and friendly feedback
+    await tester.tap(find.text('Audio Call'));
+    await tester.pump();
+    expect(find.text('Audio calling will be available soon in Phase 4.'),
+        findsOneWidget);
+
+    // Wait for snackbar to finish
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    // Verify Bottom Navigation tabs
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Contacts'), findsOneWidget);
+    expect(find.text('Calls'), findsOneWidget);
+    expect(find.text('Profile'), findsOneWidget);
+
+    // Tap Contacts Tab
+    await tester.tap(find.text('Contacts'));
+    await tester.pumpAndSettle();
+    expect(
+        find.text(
+            'User directory and search will be available soon in Phase 4.'),
+        findsOneWidget);
+
+    // Tap Calls Tab
+    await tester.tap(find.text('Calls'));
+    await tester.pumpAndSettle();
+    expect(find.text('Call History'), findsOneWidget);
+
+    // Tap Profile Tab
+    await tester.tap(find.text('Profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('Authentication Status'), findsOneWidget);
+    expect(find.text('Logout'), findsOneWidget);
+
+    // Switch back to Home Tab
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Quick Actions'), findsOneWidget);
+  });
 }

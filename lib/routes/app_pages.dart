@@ -5,6 +5,7 @@ import '../screens/auth/login/login_binding.dart';
 import '../screens/auth/login/login_screen.dart';
 import '../screens/auth/register/register_binding.dart';
 import '../screens/auth/register/register_screen.dart';
+import '../screens/home/home_binding.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/splash/splash_binding.dart';
 import '../screens/splash/splash_screen.dart';
@@ -47,6 +48,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.home,
       page: () => const HomeScreen(),
+      binding: HomeBinding(),
       transition: Transition.fadeIn,
       transitionDuration: const Duration(milliseconds: 300),
     ),
