@@ -161,12 +161,14 @@ class LoginScreen extends GetView<LoginController> {
                     ),
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
                   // Login Action Button
                   Obx(
                     () => ElevatedButton(
-                      onPressed: controller.isLoading.value ? null : controller.login,
+                      onPressed: (controller.isLoading.value || controller.isGoogleLoading.value)
+                          ? null
+                          : controller.login,
                       child: controller.isLoading.value
                           ? const SizedBox(
                               width: 22,
@@ -179,6 +181,76 @@ class LoginScreen extends GetView<LoginController> {
                           : const Text(
                               'Login',
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Divider with "OR"
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Divider(color: AppTheme.dividerColor, thickness: 1),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Text(
+                          'OR',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ),
+                      const Expanded(
+                        child: Divider(color: AppTheme.dividerColor, thickness: 1),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Google Sign-In Button
+                  Obx(
+                    () => OutlinedButton(
+                      onPressed: (controller.isLoading.value || controller.isGoogleLoading.value)
+                          ? null
+                          : controller.signInWithGoogle,
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppTheme.textPrimary,
+                        minimumSize: const Size(double.infinity, 50),
+                        side: const BorderSide(color: AppTheme.dividerColor, width: 1.2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: controller.isGoogleLoading.value
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                _buildGoogleIcon(),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Continue with Google',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                              ],
                             ),
                     ),
                   ),
@@ -212,6 +284,27 @@ class LoginScreen extends GetView<LoginController> {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Google 'G' Icon built with crisp native Flutter styling
+  Widget _buildGoogleIcon() {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          'G',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: Colors.red.shade600,
           ),
         ),
       ),

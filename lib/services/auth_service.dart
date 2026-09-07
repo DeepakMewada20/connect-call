@@ -1,15 +1,27 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
   final FirebaseAuth? _injectedAuth;
+  final GoogleSignIn? _injectedGoogleSignIn;
   FirebaseAuth? _authInstance;
+  GoogleSignIn? _googleSignInInstance;
 
-  AuthService({FirebaseAuth? auth}) : _injectedAuth = auth;
+  AuthService({
+    FirebaseAuth? auth,
+    GoogleSignIn? googleSignIn,
+  })  : _injectedAuth = auth,
+        _injectedGoogleSignIn = googleSignIn;
 
   FirebaseAuth get _instance {
     _authInstance ??= _injectedAuth ?? FirebaseAuth.instance;
     return _authInstance!;
+  }
+
+  GoogleSignIn get _googleSignIn {
+    _googleSignInInstance ??= _injectedGoogleSignIn ?? GoogleSignIn();
+    return _googleSignInInstance!;
   }
 
   // Stream of auth state changes for persistence and listeners
@@ -79,10 +91,42 @@ class AuthService {
     }
   }
 
-  // Logout from Firebase
+  // Sign in with Google
+  Future<UserCredential?> signInWithGoogle() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        // User cancelled the picker
+        return null;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      return await _instance.signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      debugPrint('AuthService.signInWithGoogle error: ${e.code} - ${e.message}');
+      throw mapFirebaseAuthError(e);
+    } catch (e) {
+      debugPrint('AuthService.signInWithGoogle unexpected error: $e');
+      throw 'Google Sign-In failed. Please try again.';
+    }
+  }
+
+  // Logout from Firebase and Google
   Future<void> logout() async {
     try {
       await _instance.signOut();
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {
+        // Google sign out error ignored if not signed in via Google
+      }
     } catch (e) {
       debugPrint('AuthService.logout error: $e');
       throw 'Failed to log out. Please try again.';
@@ -111,7 +155,7 @@ class AuthService {
       case 'network-request-failed':
         return 'Network error. Please check your internet connection.';
       case 'operation-not-allowed':
-        return 'Email/password sign-in is not enabled in Firebase Console.';
+        return 'This sign-in method is not enabled in Firebase Console.';
       default:
         return e.message?.isNotEmpty == true
             ? e.message!

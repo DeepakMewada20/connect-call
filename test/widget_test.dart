@@ -56,9 +56,11 @@ void main() {
     expect(find.text('Email Address'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
     expect(find.widgetWithText(ElevatedButton, 'Login'), findsOneWidget);
+    expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Create Account'), findsOneWidget);
 
-    // Tap Create Account
+    // Ensure Create Account button is scrolled into view and tap
+    await tester.ensureVisible(find.text('Create Account'));
     await tester.tap(find.text('Create Account'));
     await tester.pumpAndSettle();
 
