@@ -1,30 +1,66 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:connect_call/main.dart';
+import 'package:get/get.dart';
+import 'package:connect_call/core/constants/app_constants.dart';
+import 'package:connect_call/routes/app_pages.dart';
+import 'package:connect_call/routes/app_routes.dart';
+import 'package:connect_call/screens/splash/splash_controller.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  setUp(() {
+    Get.testMode = true;
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  tearDown(() {
+    Get.reset();
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets(
+      'Splash screen displays logo, app name, and navigates to Login when unauthenticated',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.splash,
+        getPages: AppPages.pages,
+      ),
+    );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Initial frame verify
+    expect(find.text(AppConstants.appName), findsOneWidget);
+    expect(find.text(AppConstants.appTagline), findsOneWidget);
+    expect(find.byIcon(Icons.call_rounded), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    // Advance time past the splash delay to complete all timers
+    await tester.pump(
+        const Duration(milliseconds: AppConstants.splashMinDurationMs + 500));
+    await tester.pumpAndSettle();
+
+    // Verify unauthenticated user is navigated to LoginScreen placeholder
+    expect(find.text('Login Screen Placeholder'), findsOneWidget);
+  });
+
+  testWidgets(
+      'Splash screen navigates to Home when user is authenticated',
+      (WidgetTester tester) async {
+    // Override SplashController with an authenticated state mock
+    Get.put<SplashController>(
+      SplashController(authStateChecker: () async => true),
+    );
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.splash,
+        getPages: AppPages.pages,
+      ),
+    );
+
+    // Advance time past the splash delay
+    await tester.pump(
+        const Duration(milliseconds: AppConstants.splashMinDurationMs + 500));
+    await tester.pumpAndSettle();
+
+    // Verify authenticated user is navigated to HomeScreen placeholder
+    expect(find.text('Home Screen Placeholder'), findsOneWidget);
   });
 }
