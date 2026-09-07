@@ -45,6 +45,7 @@ dependencies:
   permission_handler: ^12.0.3
   zego_uikit_prebuilt_call: ^4.24.4
   zego_uikit_signaling_plugin: ^2.8.21
+  zego_uikit: ^2.29.2
 
 dev_dependencies:
   flutter_test:

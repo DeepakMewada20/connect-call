@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/user_model.dart';
 import '../../routes/app_routes.dart';
 import '../../services/auth_service.dart';
+import '../../services/user_service.dart';
 import '../../services/zego_call_service.dart';
+import '../contacts/contacts_controller.dart';
 
 class HomeController extends GetxController {
   final AuthService _authService;
+  final UserService _userService;
   final ZegoCallService? zegoCallService;
 
   HomeController({
     AuthService? authService,
+    UserService? userService,
     this.zegoCallService,
-  })  : _authService = authService ?? AuthService();
+  })  : _authService = authService ?? AuthService(),
+        _userService = userService ?? UserService();
 
   ZegoCallService get activeCallService =>
       zegoCallService ?? ZegoCallService.instance;
@@ -23,6 +29,33 @@ class HomeController extends GetxController {
     // Initialize ZEGOCLOUD call listener in background when entering home
     if (!Get.testMode) {
       activeCallService.initZegoCallService();
+      _ensureUserDocumentExists();
+    }
+  }
+
+  // Ensure current logged-in user document is present in Firestore
+  Future<void> _ensureUserDocumentExists() async {
+    try {
+      final user = _authService.getCurrentUser();
+      if (user != null) {
+        final existingUser = await _userService.getUser(user.uid);
+        if (existingUser == null) {
+          final newUser = UserModel(
+            uid: user.uid,
+            name: user.displayName ?? 'User',
+            email: user.email ?? '',
+            profileImage: user.photoURL ?? '',
+            isOnline: true,
+            createdAt: DateTime.now(),
+          );
+          await _userService.createUser(newUser);
+          debugPrint('HomeController: User document synced to Firestore for ${user.uid}');
+        } else {
+          await _userService.updateOnlineStatus(user.uid, true);
+        }
+      }
+    } catch (e) {
+      debugPrint('HomeController._ensureUserDocumentExists error: $e');
     }
   }
 
@@ -31,6 +64,9 @@ class HomeController extends GetxController {
 
   void changeTab(int index) {
     selectedIndex.value = index;
+    if (index == 1 && Get.isRegistered<ContactsController>()) {
+      Get.find<ContactsController>().loadUsers();
+    }
   }
 
   // Dynamic greeting based on current local time

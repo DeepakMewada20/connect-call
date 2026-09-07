@@ -228,61 +228,85 @@ class ContactsScreen extends StatelessWidget {
   Widget _buildEmptyState(ContactsController controller) {
     final bool isSearching = controller.searchQuery.value.trim().isNotEmpty;
 
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isSearching
-                    ? Icons.search_off_rounded
-                    : Icons.people_outline_rounded,
-                size: 36,
-                color: AppTheme.primaryColor,
+    return RefreshIndicator(
+      color: AppTheme.primaryColor,
+      backgroundColor: Colors.white,
+      onRefresh: controller.loadUsers,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(32.0),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight - 64),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isSearching
+                          ? Icons.search_off_rounded
+                          : Icons.people_outline_rounded,
+                      size: 36,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'No contacts found',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isSearching
+                        ? 'Try a different name or email.'
+                        : 'Registered users will appear here.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppTheme.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (isSearching)
+                    TextButton.icon(
+                      onPressed: controller.clearSearch,
+                      icon: const Icon(Icons.clear_all_rounded, size: 18),
+                      label: const Text('Clear search'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.primaryColor,
+                      ),
+                    )
+                  else
+                    ElevatedButton.icon(
+                      onPressed: controller.loadUsers,
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Refresh Contacts'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-            const SizedBox(height: 18),
-            const Text(
-              'No contacts found',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isSearching
-                  ? 'Try a different name or email.'
-                  : 'Registered users will appear here.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppTheme.textSecondary,
-                height: 1.4,
-              ),
-            ),
-            if (isSearching) ...[
-              const SizedBox(height: 16),
-              TextButton.icon(
-                onPressed: controller.clearSearch,
-                icon: const Icon(Icons.clear_all_rounded, size: 18),
-                label: const Text('Clear search'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppTheme.primaryColor,
-                ),
-              ),
-            ],
-          ],
-        ),
+          );
+        },
       ),
     );
   }

@@ -8,6 +8,7 @@ import 'package:zego_uikit_signaling_plugin/zego_uikit_signaling_plugin.dart';
 import '../core/theme/app_theme.dart';
 import '../models/user_model.dart';
 import '../models/zego_token_response.dart';
+import '../screens/calling/custom_audio_calling_view.dart';
 import 'auth_service.dart';
 import 'user_service.dart';
 
@@ -135,9 +136,60 @@ class ZegoCallService {
         userID: currentUser.uid,
         userName: displayName,
         plugins: [ZegoUIKitSignalingPlugin()],
+        uiConfig: ZegoCallInvitationUIConfig(
+          inviter: ZegoCallInvitationInviterUIConfig(
+            defaultCameraOn: false,
+            cameraButton: ZegoCallButtonUIConfig(visible: false),
+            cameraSwitchButton: ZegoCallButtonUIConfig(visible: false),
+            backgroundBuilder: (context, size, info) {
+              return Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFF0F172A),
+                      Color(0xFF1E293B),
+                      Color(0xFF090D16),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          invitee: ZegoCallInvitationInviteeUIConfig(
+            defaultCameraOn: false,
+            showVideoOnCalling: false,
+            cameraButton: ZegoCallButtonUIConfig(visible: false),
+            cameraSwitchButton: ZegoCallButtonUIConfig(visible: false),
+            backgroundBuilder: (context, size, info) {
+              return Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFF0F172A),
+                      Color(0xFF1E293B),
+                      Color(0xFF090D16),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
         requireConfig: (ZegoCallInvitationData data) {
-          // Phase 6 is 1-to-1 Audio Calling only
-          return ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall();
+          // Phase 6 is 1-to-1 Audio Calling with custom modular UI
+          final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall();
+          config.turnOnCameraWhenJoining = false;
+          config.useSpeakerWhenJoining = false;
+          config.topMenuBar.isVisible = false;
+          config.bottomMenuBar.buttons = [];
+          config.audioVideoView.showCameraStateOnView = false;
+          config.audioVideoView.showSoundWavesInAudioMode = true;
+          config.foreground = CustomAudioCallingView(callData: data);
+          return config;
         },
       );
 
