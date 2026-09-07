@@ -1,5 +1,8 @@
 import 'package:get/get.dart';
-import '../screens/auth/login_screen.dart';
+import '../screens/auth/login/login_binding.dart';
+import '../screens/auth/login/login_screen.dart';
+import '../screens/auth/register/register_binding.dart';
+import '../screens/auth/register/register_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/splash/splash_binding.dart';
 import '../screens/splash/splash_screen.dart';
@@ -21,7 +24,15 @@ class AppPages {
     GetPage(
       name: AppRoutes.login,
       page: () => const LoginScreen(),
+      binding: LoginBinding(),
       transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
+    ),
+    GetPage(
+      name: AppRoutes.register,
+      page: () => const RegisterScreen(),
+      binding: RegisterBinding(),
+      transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
     ),
     GetPage(

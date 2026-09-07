@@ -4,6 +4,9 @@ import 'package:get/get.dart';
 import 'package:connect_call/core/constants/app_constants.dart';
 import 'package:connect_call/routes/app_pages.dart';
 import 'package:connect_call/routes/app_routes.dart';
+import 'package:connect_call/screens/auth/login/login_screen.dart';
+import 'package:connect_call/screens/auth/register/register_screen.dart';
+import 'package:connect_call/screens/home/home_screen.dart';
 import 'package:connect_call/screens/splash/splash_controller.dart';
 
 void main() {
@@ -36,12 +39,73 @@ void main() {
         const Duration(milliseconds: AppConstants.splashMinDurationMs + 500));
     await tester.pumpAndSettle();
 
-    // Verify unauthenticated user is navigated to LoginScreen placeholder
-    expect(find.text('Login Screen Placeholder'), findsOneWidget);
+    // Verify unauthenticated user is navigated to LoginScreen
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.text('Welcome back! Sign in to connect.'), findsOneWidget);
   });
 
-  testWidgets(
-      'Splash screen navigates to Home when user is authenticated',
+  testWidgets('Login screen renders fields, buttons, and navigation to Register',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.login,
+        getPages: AppPages.pages,
+      ),
+    );
+
+    expect(find.text('Email Address'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Login'), findsOneWidget);
+    expect(find.text('Create Account'), findsOneWidget);
+
+    // Tap Create Account
+    await tester.tap(find.text('Create Account'));
+    await tester.pumpAndSettle();
+
+    // Verify RegisterScreen is pushed
+    expect(find.byType(RegisterScreen), findsOneWidget);
+    expect(find.text('Full Name'), findsOneWidget);
+    expect(find.text('Confirm Password'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Create Account'), findsOneWidget);
+  });
+
+  testWidgets('Login validation triggers on empty fields',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.login,
+        getPages: AppPages.pages,
+      ),
+    );
+
+    // Tap Login with empty fields
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Login'));
+    await tester.pumpAndSettle();
+
+    // Verify validation errors appear
+    expect(find.text('Email is required'), findsOneWidget);
+    expect(find.text('Password is required'), findsOneWidget);
+  });
+
+  testWidgets('Register validation triggers on empty/mismatched fields',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.register,
+        getPages: AppPages.pages,
+      ),
+    );
+
+    // Tap Create Account with empty fields
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Create Account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Please enter your name'), findsOneWidget);
+    expect(find.text('Email is required'), findsOneWidget);
+    expect(find.text('Password is required'), findsOneWidget);
+  });
+
+  testWidgets('Splash screen navigates to Home when user is authenticated',
       (WidgetTester tester) async {
     // Override SplashController with an authenticated state mock
     Get.put<SplashController>(
@@ -60,7 +124,8 @@ void main() {
         const Duration(milliseconds: AppConstants.splashMinDurationMs + 500));
     await tester.pumpAndSettle();
 
-    // Verify authenticated user is navigated to HomeScreen placeholder
-    expect(find.text('Home Screen Placeholder'), findsOneWidget);
+    // Verify authenticated user is navigated to HomeScreen
+    expect(Get.currentRoute, AppRoutes.home);
+    expect(find.byType(HomeScreen), findsOneWidget);
   });
 }
