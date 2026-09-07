@@ -1,4 +1,6 @@
 import 'package:get/get.dart';
+import '../screens/auth/forgot_password/forgot_password_binding.dart';
+import '../screens/auth/forgot_password/forgot_password_screen.dart';
 import '../screens/auth/login/login_binding.dart';
 import '../screens/auth/login/login_screen.dart';
 import '../screens/auth/register/register_binding.dart';
@@ -32,6 +34,13 @@ class AppPages {
       name: AppRoutes.register,
       page: () => const RegisterScreen(),
       binding: RegisterBinding(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 300),
+    ),
+    GetPage(
+      name: AppRoutes.forgotPassword,
+      page: () => const ForgotPasswordScreen(),
+      binding: ForgotPasswordBinding(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
     ),

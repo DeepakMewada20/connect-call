@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:connect_call/core/constants/app_constants.dart';
 import 'package:connect_call/routes/app_pages.dart';
 import 'package:connect_call/routes/app_routes.dart';
+import 'package:connect_call/screens/auth/forgot_password/forgot_password_screen.dart';
 import 'package:connect_call/screens/auth/login/login_screen.dart';
 import 'package:connect_call/screens/auth/register/register_screen.dart';
 import 'package:connect_call/screens/home/home_screen.dart';
@@ -55,6 +56,7 @@ void main() {
 
     expect(find.text('Email Address'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
+    expect(find.text('Forgot Password?'), findsOneWidget);
     expect(find.widgetWithText(ElevatedButton, 'Login'), findsOneWidget);
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.text('Create Account'), findsOneWidget);
@@ -105,6 +107,38 @@ void main() {
     expect(find.text('Please enter your name'), findsOneWidget);
     expect(find.text('Email is required'), findsOneWidget);
     expect(find.text('Password is required'), findsOneWidget);
+  });
+
+  testWidgets('Forgot password flow navigates from Login and validates email',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.login,
+        getPages: AppPages.pages,
+      ),
+    );
+
+    // Tap Forgot Password
+    await tester.tap(find.text('Forgot Password?'));
+    await tester.pumpAndSettle();
+
+    // Verify ForgotPasswordScreen is displayed
+    expect(find.byType(ForgotPasswordScreen), findsOneWidget);
+    expect(find.text('Forgot Password?'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Send Reset Link'), findsOneWidget);
+
+    // Submit with empty email to verify validation
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Send Reset Link'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Email is required'), findsOneWidget);
+
+    // Tap Back to Login
+    await tester.tap(find.text('Back to Login'));
+    await tester.pumpAndSettle();
+
+    // Verify returned to LoginScreen
+    expect(find.byType(LoginScreen), findsOneWidget);
   });
 
   testWidgets('Splash screen navigates to Home when user is authenticated',

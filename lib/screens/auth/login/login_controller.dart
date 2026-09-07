@@ -146,4 +146,8 @@ class LoginController extends GetxController {
   void goToRegister() {
     Get.toNamed(AppRoutes.register);
   }
+
+  void goToForgotPassword() {
+    Get.toNamed(AppRoutes.forgotPassword);
+  }
 }

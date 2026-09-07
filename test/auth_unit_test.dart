@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:connect_call/models/user_model.dart';
+import 'package:connect_call/screens/auth/forgot_password/forgot_password_controller.dart';
 import 'package:connect_call/screens/auth/login/login_controller.dart';
 import 'package:connect_call/screens/auth/register/register_controller.dart';
 import 'package:connect_call/services/auth_service.dart';
@@ -39,6 +40,7 @@ void main() {
   group('Validation Tests', () {
     final loginController = LoginController();
     final registerController = RegisterController();
+    final forgotPasswordController = ForgotPasswordController();
 
     test('Email validation tests', () {
       expect(loginController.validateEmail(''), 'Email is required');
@@ -48,6 +50,9 @@ void main() {
       expect(loginController.validateEmail('user@domain'),
           'Please enter a valid email address');
       expect(loginController.validateEmail('test@example.com'), isNull);
+
+      expect(forgotPasswordController.validateEmail(''), 'Email is required');
+      expect(forgotPasswordController.validateEmail('test@example.com'), isNull);
     });
 
     test('Password validation tests', () {

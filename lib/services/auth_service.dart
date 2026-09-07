@@ -118,6 +118,20 @@ class AuthService {
     }
   }
 
+  // Send password reset email
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    try {
+      await _instance.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (e) {
+      debugPrint(
+          'AuthService.sendPasswordResetEmail error: ${e.code} - ${e.message}');
+      throw mapFirebaseAuthError(e);
+    } catch (e) {
+      debugPrint('AuthService.sendPasswordResetEmail unexpected error: $e');
+      throw 'Failed to send password reset email. Please try again.';
+    }
+  }
+
   // Logout from Firebase and Google
   Future<void> logout() async {
     try {
