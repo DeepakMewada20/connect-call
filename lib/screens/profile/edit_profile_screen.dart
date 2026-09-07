@@ -59,7 +59,7 @@ class EditProfileScreen extends GetView<EditProfileController> {
   Widget _buildAvatarPicker(BuildContext context) {
     return Center(
       child: GestureDetector(
-        onTap: controller.pickImage,
+        onTap: controller.showImageSourceSelector,
         child: Stack(
           children: [
             Obx(() {
