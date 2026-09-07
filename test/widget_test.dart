@@ -213,7 +213,7 @@ void main() {
     // Tap Profile Tab
     await tester.tap(find.text('Profile'));
     await tester.pumpAndSettle();
-    expect(find.text('Authentication Status'), findsOneWidget);
+    expect(find.text('Edit Profile'), findsOneWidget);
     expect(find.text('Logout'), findsOneWidget);
 
     // Switch back to Home Tab

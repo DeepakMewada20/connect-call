@@ -66,4 +66,24 @@ class UserService {
       debugPrint('UserService.updateOnlineStatus error: $e');
     }
   }
+
+  // Update user profile fields (name and optional profileImage)
+  Future<void> updateUserProfile({
+    required String uid,
+    required String name,
+    String? profileImage,
+  }) async {
+    try {
+      final Map<String, dynamic> data = {
+        'name': name.trim(),
+      };
+      if (profileImage != null) {
+        data['profileImage'] = profileImage.trim();
+      }
+      await _usersCollection.doc(uid).update(data);
+    } catch (e) {
+      debugPrint('UserService.updateUserProfile error: $e');
+      throw 'Unable to update profile. Please try again.';
+    }
+  }
 }

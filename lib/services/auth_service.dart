@@ -54,6 +54,16 @@ class AuthService {
     }
   }
 
+  // Update Firebase Auth display name
+  Future<void> updateDisplayName(String name) async {
+    try {
+      await _instance.currentUser?.updateDisplayName(name.trim());
+      await _instance.currentUser?.reload();
+    } catch (e) {
+      debugPrint('AuthService.updateDisplayName error: $e');
+    }
+  }
+
   // Register with email and password
   Future<UserCredential> register({
     required String email,

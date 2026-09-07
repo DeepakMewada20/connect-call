@@ -7,6 +7,8 @@ import '../screens/auth/register/register_binding.dart';
 import '../screens/auth/register/register_screen.dart';
 import '../screens/home/home_binding.dart';
 import '../screens/home/home_screen.dart';
+import '../screens/profile/edit_profile_binding.dart';
+import '../screens/profile/edit_profile_screen.dart';
 import '../screens/splash/splash_binding.dart';
 import '../screens/splash/splash_screen.dart';
 import 'app_routes.dart';
@@ -50,6 +52,13 @@ class AppPages {
       page: () => const HomeScreen(),
       binding: HomeBinding(),
       transition: Transition.fadeIn,
+      transitionDuration: const Duration(milliseconds: 300),
+    ),
+    GetPage(
+      name: AppRoutes.editProfile,
+      page: () => const EditProfileScreen(),
+      binding: EditProfileBinding(),
+      transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
     ),
   ];
