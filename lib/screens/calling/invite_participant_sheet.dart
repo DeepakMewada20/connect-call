@@ -120,11 +120,20 @@ class _InviteParticipantSheetState extends State<InviteParticipantSheet> {
           ? all.where((u) => u.uid != currentUid).toList()
           : all;
 
+      final query = _searchController.text.trim().toLowerCase();
+      final filtered = query.isEmpty
+          ? List<UserModel>.from(others)
+          : others.where((u) {
+              final name = u.name.toLowerCase();
+              final email = u.email.toLowerCase();
+              return name.contains(query) || email.contains(query);
+            }).toList();
+
       if (mounted) {
         setState(() {
           _connectedUserIds = connectedIds;
           _allContacts = others;
-          _onSearchChanged();
+          _filteredContacts = filtered;
           _isLoading = false;
         });
       }
@@ -138,17 +147,18 @@ class _InviteParticipantSheetState extends State<InviteParticipantSheet> {
 
   void _onSearchChanged() {
     final query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) {
-      _filteredContacts = List.from(_allContacts);
-    } else {
-      _filteredContacts = _allContacts.where((u) {
-        final name = u.name.toLowerCase();
-        final email = u.email.toLowerCase();
-        return name.contains(query) || email.contains(query);
-      }).toList();
-    }
     if (mounted) {
-      setState(() {});
+      setState(() {
+        if (query.isEmpty) {
+          _filteredContacts = List.from(_allContacts);
+        } else {
+          _filteredContacts = _allContacts.where((u) {
+            final name = u.name.toLowerCase();
+            final email = u.email.toLowerCase();
+            return name.contains(query) || email.contains(query);
+          }).toList();
+        }
+      });
     }
   }
 
@@ -171,16 +181,18 @@ class _InviteParticipantSheetState extends State<InviteParticipantSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        decoration: const BoxDecoration(
-          color: Color(0xFF1E293B),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-      child: Column(
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.75,
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E293B),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Drag handle
@@ -294,53 +306,70 @@ class _InviteParticipantSheetState extends State<InviteParticipantSheet> {
                           final isAlreadyInCall = _connectedUserIds.contains(user.uid);
                           final isInviting = _invitingUserId == user.uid;
 
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                            leading: CircleAvatar(
-                              radius: 22,
-                              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.2),
-                              backgroundImage: user.profileImage.isNotEmpty
-                                  ? NetworkImage(user.profileImage)
-                                  : null,
-                              child: user.profileImage.isEmpty
-                                  ? Text(
-                                      user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.2),
+                                  backgroundImage: user.profileImage.isNotEmpty
+                                      ? NetworkImage(user.profileImage)
+                                      : null,
+                                  child: user.profileImage.isEmpty
+                                      ? Text(
+                                          user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        user.name.isNotEmpty ? user.name : 'User',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 15,
+                                        ),
                                       ),
-                                    )
-                                  : null,
-                            ),
-                            title: Text(
-                              user.name.isNotEmpty ? user.name : 'User',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                              ),
-                            ),
-                            subtitle: Text(
-                              user.email,
-                              style: const TextStyle(
-                                color: Colors.white54,
-                                fontSize: 13,
-                              ),
-                            ),
-                            trailing: isAlreadyInCall
-                                ? Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        user.email,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                if (isAlreadyInCall)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withValues(alpha: 0.08),
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(10),
                                       border: Border.all(color: Colors.white12),
                                     ),
                                     child: const Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(Icons.phone_in_talk_rounded, color: Colors.greenAccent, size: 14),
-                                        SizedBox(width: 6),
+                                        SizedBox(width: 5),
                                         Text(
                                           'In Call',
                                           style: TextStyle(
@@ -352,37 +381,54 @@ class _InviteParticipantSheetState extends State<InviteParticipantSheet> {
                                       ],
                                     ),
                                   )
-                                : ElevatedButton.icon(
-                                    onPressed: isInviting ? null : () => _inviteContact(user),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primaryColor,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                else
+                                  Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: isInviting ? null : () => _inviteContact(user),
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: Ink(
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.primaryColor,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: isInviting
+                                            ? const SizedBox(
+                                                width: 14,
+                                                height: 14,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.add_rounded, size: 16, color: Colors.white),
+                                                  SizedBox(width: 4),
+                                                  Text(
+                                                    'Invite',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.w600,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
                                       ),
                                     ),
-                                    icon: isInviting
-                                        ? const SizedBox(
-                                            width: 14,
-                                            height: 14,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white,
-                                            ),
-                                          )
-                                        : const Icon(Icons.add_rounded, size: 18),
-                                    label: Text(
-                                      isInviting ? 'Inviting' : 'Invite',
-                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                    ),
                                   ),
+                              ],
+                            ),
                           );
                         },
                       ),
           ),
         ],
       ),
+    ),
     ),
     );
   }

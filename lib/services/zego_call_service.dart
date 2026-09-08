@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -150,6 +151,12 @@ class ZegoCallService {
         userID: currentUser.uid,
         userName: displayName,
         plugins: [ZegoUIKitSignalingPlugin()],
+        config: ZegoCallInvitationConfig(
+          inCalling: ZegoCallInvitationInCallingConfig(
+            canInvitingInCalling: true,
+            onlyInitiatorCanInvite: false,
+          ),
+        ),
         uiConfig: ZegoCallInvitationUIConfig(
           inviter: ZegoCallInvitationInviterUIConfig(
             defaultCameraOn: true,
@@ -242,6 +249,7 @@ class ZegoCallService {
           },
         ),
         requireConfig: (ZegoCallInvitationData data) {
+          activeCallId.value = data.callID;
           final isGroup = data.invitees.length > 1;
 
           if (data.type == ZegoCallInvitationType.videoCall) {
@@ -751,11 +759,20 @@ class ZegoCallService {
       return true;
     }
 
-    final currentRoomId = ZegoUIKit().getRoom().id;
+    // Resolve room ID with triple fallback: UIKit room -> activeCallId -> invitation data
+    final String currentRoomId = ZegoUIKit().getRoom().id.isNotEmpty
+        ? ZegoUIKit().getRoom().id
+        : (activeCallId.value.isNotEmpty
+            ? activeCallId.value
+            : ZegoUIKitPrebuiltCallInvitationService()
+                .private
+                .currentCallInvitationDataSafe
+                .callID);
+
     if (currentRoomId.isEmpty) {
       Get.snackbar(
         'Conference Unavailable',
-        'No active call found to add participants.',
+        'No active call room found to add participants.',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red.shade600,
         colorText: Colors.white,
@@ -781,14 +798,96 @@ class ZegoCallService {
       final inviteeName =
           targetUser.name.isNotEmpty ? targetUser.name : 'User';
 
-      final bool sent = await ZegoUIKitPrebuiltCallInvitationService().send(
-        invitees: [
-          ZegoCallUser(targetUser.uid, inviteeName),
-        ],
-        isVideoCall: isVideo,
-        callID: currentRoomId,
-        timeoutSeconds: 60,
-      );
+      bool sent = false;
+
+      // 1. Primary: Standard ZEGOCLOUD Prebuilt Call invitation service
+      try {
+        sent = await ZegoUIKitPrebuiltCallInvitationService().send(
+          invitees: [
+            ZegoCallUser(targetUser.uid, inviteeName),
+          ],
+          isVideoCall: isVideo,
+          callID: currentRoomId,
+          timeoutSeconds: 60,
+        );
+        debugPrint('ZegoPrebuiltCallInvitationService.send returned: $sent');
+      } catch (e) {
+        debugPrint('ZegoPrebuiltCallInvitationService.send error: $e');
+      }
+
+      // 2. Resilient Fallback: Direct Signaling Plugin invitation to the active room
+      if (!sent) {
+        debugPrint(
+            'Prebuilt send returned false; attempting signaling fallback to room: $currentRoomId');
+        final currentUserName = ZegoUIKit().getLocalUser().name.isNotEmpty
+            ? ZegoUIKit().getLocalUser().name
+            : (_authService.getCurrentUser()?.displayName ?? 'User');
+        final currentUserId = ZegoUIKit().getLocalUser().id.isNotEmpty
+            ? ZegoUIKit().getLocalUser().id
+            : (currentUid ?? '');
+
+        final payload = jsonEncode({
+          'call_id': currentRoomId,
+          'inviter_name': currentUserName,
+          'invitees': [
+            {'user_id': targetUser.uid, 'user_name': inviteeName}
+          ],
+          'timeout': 60,
+          'custom_data': '',
+        });
+
+        final int invitationType = isVideo ? 1 : 0;
+
+        // Try sendAdvanceInvitation first
+        try {
+          final advanceResult =
+              await ZegoUIKit().getSignalingPlugin().sendAdvanceInvitation(
+                    inviterID: currentUserId,
+                    inviterName: currentUserName,
+                    invitees: [targetUser.uid],
+                    timeout: 60,
+                    type: invitationType,
+                    data: payload,
+                  );
+          if (advanceResult.error == null ||
+              (advanceResult.error?.code.isEmpty ?? true)) {
+            sent = true;
+            debugPrint(
+                'Signaling advance invitation sent successfully: ${advanceResult.invitationID}');
+          } else {
+            debugPrint(
+                'Signaling advance invitation returned code: ${advanceResult.error?.code}');
+          }
+        } catch (e) {
+          debugPrint('sendAdvanceInvitation exception: $e');
+        }
+
+        // Try standard sendInvitation if advance invitation wasn't successful
+        if (!sent) {
+          try {
+            final basicResult =
+                await ZegoUIKit().getSignalingPlugin().sendInvitation(
+                      inviterID: currentUserId,
+                      inviterName: currentUserName,
+                      invitees: [targetUser.uid],
+                      timeout: 60,
+                      type: invitationType,
+                      data: payload,
+                    );
+            if (basicResult.error == null ||
+                (basicResult.error?.code.isEmpty ?? true)) {
+              sent = true;
+              debugPrint(
+                  'Basic signaling invitation sent successfully: ${basicResult.invitationID}');
+            } else {
+              debugPrint(
+                  'Basic signaling invitation returned code: ${basicResult.error?.code}');
+            }
+          } catch (e) {
+            debugPrint('sendInvitation exception: $e');
+          }
+        }
+      }
 
       if (sent) {
         Get.snackbar(
