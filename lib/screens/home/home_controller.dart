@@ -111,7 +111,7 @@ class HomeController extends GetxController {
   void onVideoCallTap() {
     Get.snackbar(
       'Video Call',
-      'Video calling will be available in Phase 7. Audio calling is now active!',
+      'Select any contact from the Contacts tab to start a 1-to-1 video call.',
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: AppTheme.primaryColor,
       colorText: Colors.white,

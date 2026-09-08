@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../core/theme/app_theme.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
@@ -97,16 +96,8 @@ class ContactsController extends GetxController {
     await activeCallService.sendAudioCallInvitation(targetUser: user);
   }
 
-  // Video call action: placeholder for Phase 7
-  void onVideoCallTap(UserModel user) {
-    Get.snackbar(
-      'Video Call',
-      'Video calling will be available in Phase 7. Use the green audio call button for voice calls.',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: AppTheme.primaryColor,
-      colorText: Colors.white,
-      margin: const EdgeInsets.all(16),
-      duration: const Duration(seconds: 3),
-    );
+  // Video call action: initiates real 1-to-1 video call via ZegoCallService
+  Future<void> onVideoCallTap(UserModel user) async {
+    await activeCallService.sendVideoCallInvitation(targetUser: user);
   }
 }

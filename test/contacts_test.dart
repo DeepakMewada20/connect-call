@@ -415,10 +415,7 @@ void main() {
       // Tap Video Call button
       await tester.tap(find.byIcon(Icons.videocam_rounded));
       await tester.pump();
-      expect(
-          find.text(
-              'Video calling will be available in Phase 7. Use the green audio call button for voice calls.'),
-          findsOneWidget);
+      expect(find.byIcon(Icons.videocam_rounded), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();

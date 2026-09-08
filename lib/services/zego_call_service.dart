@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:zego_uikit/zego_uikit.dart';
 import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 import 'package:zego_uikit_signaling_plugin/zego_uikit_signaling_plugin.dart';
 
@@ -138,10 +139,11 @@ class ZegoCallService {
         plugins: [ZegoUIKitSignalingPlugin()],
         uiConfig: ZegoCallInvitationUIConfig(
           inviter: ZegoCallInvitationInviterUIConfig(
-            defaultCameraOn: false,
-            cameraButton: ZegoCallButtonUIConfig(visible: false),
-            cameraSwitchButton: ZegoCallButtonUIConfig(visible: false),
+            defaultCameraOn: true,
             backgroundBuilder: (context, size, info) {
+              if (info.callType == ZegoCallInvitationType.videoCall) {
+                return null;
+              }
               return Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -158,11 +160,12 @@ class ZegoCallService {
             },
           ),
           invitee: ZegoCallInvitationInviteeUIConfig(
-            defaultCameraOn: false,
-            showVideoOnCalling: false,
-            cameraButton: ZegoCallButtonUIConfig(visible: false),
-            cameraSwitchButton: ZegoCallButtonUIConfig(visible: false),
+            defaultCameraOn: true,
+            showVideoOnCalling: true,
             backgroundBuilder: (context, size, info) {
+              if (info.callType == ZegoCallInvitationType.videoCall) {
+                return null;
+              }
               return Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -184,9 +187,47 @@ class ZegoCallService {
             debugPrint('ZegoCallService onCallEnd: ${event.reason}');
             defaultAction();
           },
+          user: ZegoCallUserEvents(
+            onLeave: (user) {
+              debugPrint('Remote user ${user.id} (${user.name}) left the call.');
+              final context = navigatorKey.currentContext ?? Get.context;
+              if (context != null && context.mounted) {
+                try {
+                  ZegoUIKitPrebuiltCallController().hangUp(context);
+                } catch (e) {
+                  debugPrint('Auto hangup on user leave: $e');
+                }
+              }
+            },
+          ),
         ),
         requireConfig: (ZegoCallInvitationData data) {
-          // Phase 6 is 1-to-1 Audio Calling with custom modular UI
+          if (data.type == ZegoCallInvitationType.videoCall) {
+            // Phase 7: Functional 1-to-1 Video Calling UI
+            final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVideoCall();
+            config.turnOnCameraWhenJoining = true;
+            config.turnOnMicrophoneWhenJoining = true;
+            config.useSpeakerWhenJoining = true;
+            config.layout = ZegoLayout.pictureInPicture(
+              isSmallViewDraggable: true,
+              switchLargeOrSmallViewByClick: true,
+              smallViewPosition: ZegoViewPosition.topRight,
+            );
+            config.bottomMenuBar.buttons = [
+              ZegoCallMenuBarButtonName.toggleCameraButton,
+              ZegoCallMenuBarButtonName.switchCameraButton,
+              ZegoCallMenuBarButtonName.hangUpButton,
+              ZegoCallMenuBarButtonName.toggleMicrophoneButton,
+              ZegoCallMenuBarButtonName.switchAudioOutputButton,
+            ];
+            config.audioVideoView.useVideoViewAspectFill = true;
+            config.audioVideoView.showCameraStateOnView = true;
+            config.audioVideoView.showMicrophoneStateOnView = true;
+            config.audioVideoView.showUserNameOnView = true;
+            return config;
+          }
+
+          // Phase 6: 1-to-1 Audio Calling with custom modular UI
           final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall();
           config.turnOnCameraWhenJoining = false;
           config.useSpeakerWhenJoining = false;
@@ -228,7 +269,7 @@ class ZegoCallService {
     }
   }
 
-  /// Check and request microphone permission before an audio call
+  /// Check and request microphone permission before an audio or video call
   Future<bool> checkMicrophonePermission() async {
     final status = await Permission.microphone.status;
     if (status.isGranted) {
@@ -241,11 +282,15 @@ class ZegoCallService {
     }
 
     if (result.isPermanentlyDenied) {
-      _showPermissionSettingsDialog();
+      _showPermissionSettingsDialog(
+        permissionName: 'Microphone Permission',
+        featureDescription:
+            'Microphone permission is permanently disabled. Please enable it in device settings to make audio and video calls.',
+      );
     } else {
       Get.snackbar(
         'Microphone Permission Required',
-        'Please grant microphone permission to make audio calls.',
+        'Please grant microphone permission to make calls.',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.amber.shade800,
         colorText: Colors.white,
@@ -254,6 +299,49 @@ class ZegoCallService {
       );
     }
     return false;
+  }
+
+  /// Check and request camera permission before a video call
+  Future<bool> checkCameraPermission() async {
+    final status = await Permission.camera.status;
+    if (status.isGranted) {
+      return true;
+    }
+
+    final result = await Permission.camera.request();
+    if (result.isGranted) {
+      return true;
+    }
+
+    if (result.isPermanentlyDenied) {
+      _showPermissionSettingsDialog(
+        permissionName: 'Camera Permission',
+        featureDescription:
+            'Camera permission is permanently disabled. Please enable it in device settings to make video calls.',
+      );
+    } else {
+      Get.snackbar(
+        'Camera Permission Required',
+        'Please grant camera permission to make video calls.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.amber.shade800,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+      );
+    }
+    return false;
+  }
+
+  /// Check both microphone and camera permissions required for video calls
+  Future<bool> checkVideoCallPermissions() async {
+    final micGranted = await checkMicrophonePermission();
+    if (!micGranted) return false;
+
+    final cameraGranted = await checkCameraPermission();
+    if (!cameraGranted) return false;
+
+    return true;
   }
 
   /// Send a 1-to-1 audio call invitation to the target user
@@ -362,16 +450,124 @@ class ZegoCallService {
     }
   }
 
-  void _showPermissionSettingsDialog() {
+  /// Send a 1-to-1 video call invitation to the target user
+  Future<bool> sendVideoCallInvitation({
+    required UserModel targetUser,
+  }) async {
+    if (Get.testMode) {
+      return true;
+    }
+
+    // 1. Prevent duplicate simultaneous call attempts
+    if (isCalling.value) {
+      Get.snackbar(
+        'Call in Progress',
+        'A call is already being initiated.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: AppTheme.primaryColor,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+      );
+      return false;
+    }
+
+    final currentUid = _authService.currentUserId;
+    if (currentUid == null || currentUid.isEmpty) {
+      Get.snackbar(
+        'Authentication Required',
+        'Please log in to make calls.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade600,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+      );
+      return false;
+    }
+
+    if (targetUser.uid == currentUid) {
+      Get.snackbar(
+        'Invalid Action',
+        'You cannot call yourself.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.amber.shade800,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+      );
+      return false;
+    }
+
+    // 2. Verify microphone and camera permissions
+    final hasPermissions = await checkVideoCallPermissions();
+    if (!hasPermissions) return false;
+
+    // 3. Ensure service is initialized
+    if (!isInitialized.value) {
+      final initialized = await initZegoCallService();
+      if (!initialized) {
+        Get.snackbar(
+          'Service Unavailable',
+          'Unable to connect to call service. Please check your network and try again.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade600,
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+        );
+        return false;
+      }
+    }
+
+    isCalling.value = true;
+    try {
+      final inviteeName =
+          targetUser.name.isNotEmpty ? targetUser.name : 'User';
+
+      final bool sent = await ZegoUIKitPrebuiltCallInvitationService().send(
+        invitees: [
+          ZegoCallUser(targetUser.uid, inviteeName),
+        ],
+        isVideoCall: true, // Strict Phase 7 Requirement: VIDEO CALL
+        timeoutSeconds: 60,
+      );
+
+      if (!sent) {
+        Get.snackbar(
+          'Call Failed',
+          'Unable to send video call invitation to $inviteeName. Please try again.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade600,
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+        );
+      }
+      return sent;
+    } catch (e) {
+      debugPrint('sendVideoCallInvitation error: $e');
+      Get.snackbar(
+        'Call Error',
+        'An unexpected error occurred while placing the video call.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade600,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+      );
+      return false;
+    } finally {
+      isCalling.value = false;
+    }
+  }
+
+  void _showPermissionSettingsDialog({
+    required String permissionName,
+    required String featureDescription,
+  }) {
     Get.defaultDialog(
-      title: 'Microphone Permission',
+      title: permissionName,
       titleStyle: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
         color: AppTheme.textPrimary,
       ),
-      middleText:
-          'Microphone permission is permanently disabled. Please enable it in device settings to make audio calls.',
+      middleText: featureDescription,
       middleTextStyle: const TextStyle(
         fontSize: 14,
         color: AppTheme.textSecondary,

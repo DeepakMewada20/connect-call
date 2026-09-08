@@ -120,10 +120,10 @@ class UserTile extends StatelessWidget {
             const SizedBox(width: 6),
             _buildActionButton(
               icon: Icons.videocam_rounded,
-              tooltip: 'Video Call (Coming in Phase 7)',
+              tooltip: 'Start Video Call',
               color: AppTheme.primaryColor,
               onTap: onVideoCall,
-              isEnabled: false,
+              isEnabled: true,
             ),
           ],
         ),

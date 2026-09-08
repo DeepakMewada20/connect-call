@@ -80,6 +80,19 @@ void main() {
       final callSent = await service.sendAudioCallInvitation(targetUser: targetUser);
       expect(callSent, isTrue);
     });
+
+    test('Bypasses native hardware in test mode for video call invitations', () async {
+      final service = ZegoCallService();
+      final targetUser = UserModel(
+        uid: 'user_target_123',
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        createdAt: DateTime.now(),
+      );
+
+      final callSent = await service.sendVideoCallInvitation(targetUser: targetUser);
+      expect(callSent, isTrue);
+    });
   });
 
   group('CustomAudioCallingView Widget Tests', () {
