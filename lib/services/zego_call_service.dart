@@ -11,6 +11,7 @@ import '../models/user_model.dart';
 import '../models/zego_token_response.dart';
 import '../routes/app_routes.dart';
 import '../screens/calling/custom_audio_calling_view.dart';
+import '../screens/calling/invite_participant_sheet.dart';
 import 'auth_service.dart';
 import 'user_service.dart';
 
@@ -241,6 +242,8 @@ class ZegoCallService {
           },
         ),
         requireConfig: (ZegoCallInvitationData data) {
+          final isGroup = data.invitees.length > 1;
+
           if (data.type == ZegoCallInvitationType.videoCall) {
             // Proactively ensure camera is permitted and turned on for receiver
             Permission.camera.request().then((status) {
@@ -249,22 +252,52 @@ class ZegoCallService {
               }
             });
 
-            // Phase 7: Functional 1-to-1 Video Calling UI
-            final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVideoCall();
+            // Functional 1-to-1 or Multi-user Video Conference Call
+            final config = isGroup
+                ? ZegoUIKitPrebuiltCallConfig.groupVideoCall()
+                : ZegoUIKitPrebuiltCallConfig.oneOnOneVideoCall();
+
             config.turnOnCameraWhenJoining = true;
             config.turnOnMicrophoneWhenJoining = true;
             config.useSpeakerWhenJoining = true;
-            config.layout = ZegoLayout.pictureInPicture(
-              isSmallViewDraggable: true,
-              switchLargeOrSmallViewByClick: true,
-              smallViewPosition: ZegoViewPosition.topRight,
-            );
+
+            if (isGroup) {
+              config.layout = ZegoLayout.gallery();
+            } else {
+              config.layout = ZegoLayout.pictureInPicture(
+                isSmallViewDraggable: true,
+                switchLargeOrSmallViewByClick: true,
+                smallViewPosition: ZegoViewPosition.topRight,
+              );
+            }
+
+            // In-call invite button in top bar to add more participants into conference
+            config.topMenuBar.extendButtons = [
+              Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Add to Conference',
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.person_add_rounded, color: Colors.white, size: 20),
+                  ),
+                  onPressed: () {
+                    InviteParticipantSheet.show(context, isVideo: true);
+                  },
+                ),
+              ),
+            ];
+
             config.bottomMenuBar.buttons = [
               ZegoCallMenuBarButtonName.toggleCameraButton,
               ZegoCallMenuBarButtonName.switchCameraButton,
               ZegoCallMenuBarButtonName.hangUpButton,
               ZegoCallMenuBarButtonName.toggleMicrophoneButton,
               ZegoCallMenuBarButtonName.switchAudioOutputButton,
+              ZegoCallMenuBarButtonName.showMemberListButton,
             ];
             config.audioVideoView.useVideoViewAspectFill = true;
             config.audioVideoView.showCameraStateOnView = true;
@@ -273,8 +306,11 @@ class ZegoCallService {
             return config;
           }
 
-          // Phase 6: 1-to-1 Audio Calling with custom modular UI
-          final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall();
+          // Audio Calling (1-to-1 or Conference) with custom modular UI
+          final config = isGroup
+              ? ZegoUIKitPrebuiltCallConfig.groupVoiceCall()
+              : ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall();
+
           config.turnOnCameraWhenJoining = false;
           config.turnOnMicrophoneWhenJoining = true;
           config.useSpeakerWhenJoining = true;
@@ -601,6 +637,183 @@ class ZegoCallService {
       return false;
     } finally {
       isCalling.value = false;
+    }
+  }
+
+  /// Send a group / conference audio call invitation to multiple users
+  Future<bool> sendGroupAudioCallInvitation({
+    required List<UserModel> targetUsers,
+  }) async {
+    if (Get.testMode) return true;
+    if (targetUsers.isEmpty) return false;
+
+    if (targetUsers.length == 1) {
+      return sendAudioCallInvitation(targetUser: targetUsers.first);
+    }
+
+    final hasPermission = await checkMicrophonePermission();
+    if (!hasPermission) return false;
+
+    if (!isInitialized.value) {
+      final initialized = await initZegoCallService();
+      if (!initialized) return false;
+    }
+
+    isCalling.value = true;
+    try {
+      final invitees = targetUsers.map((u) {
+        final name = u.name.isNotEmpty ? u.name : 'User';
+        return ZegoCallUser(u.uid, name);
+      }).toList();
+
+      final bool sent = await ZegoUIKitPrebuiltCallInvitationService().send(
+        invitees: invitees,
+        isVideoCall: false,
+        timeoutSeconds: 60,
+      );
+
+      if (!sent) {
+        Get.snackbar(
+          'Call Failed',
+          'Unable to send group audio call invitation.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade600,
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+        );
+      }
+      return sent;
+    } catch (e) {
+      debugPrint('sendGroupAudioCallInvitation error: $e');
+      return false;
+    } finally {
+      isCalling.value = false;
+    }
+  }
+
+  /// Send a group / conference video call invitation to multiple users
+  Future<bool> sendGroupVideoCallInvitation({
+    required List<UserModel> targetUsers,
+  }) async {
+    if (Get.testMode) return true;
+    if (targetUsers.isEmpty) return false;
+
+    if (targetUsers.length == 1) {
+      return sendVideoCallInvitation(targetUser: targetUsers.first);
+    }
+
+    final hasPermissions = await checkVideoCallPermissions();
+    if (!hasPermissions) return false;
+
+    if (!isInitialized.value) {
+      final initialized = await initZegoCallService();
+      if (!initialized) return false;
+    }
+
+    isCalling.value = true;
+    try {
+      final invitees = targetUsers.map((u) {
+        final name = u.name.isNotEmpty ? u.name : 'User';
+        return ZegoCallUser(u.uid, name);
+      }).toList();
+
+      final bool sent = await ZegoUIKitPrebuiltCallInvitationService().send(
+        invitees: invitees,
+        isVideoCall: true,
+        timeoutSeconds: 60,
+      );
+
+      if (!sent) {
+        Get.snackbar(
+          'Call Failed',
+          'Unable to send group video call invitation.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade600,
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+        );
+      }
+      return sent;
+    } catch (e) {
+      debugPrint('sendGroupVideoCallInvitation error: $e');
+      return false;
+    } finally {
+      isCalling.value = false;
+    }
+  }
+
+  /// Invite a registered contact to the currently active audio or video conference
+  Future<bool> inviteToOngoingCall({
+    required UserModel targetUser,
+    required bool isVideo,
+  }) async {
+    if (Get.testMode) {
+      return true;
+    }
+
+    final currentRoomId = ZegoUIKit().getRoom().id;
+    if (currentRoomId.isEmpty) {
+      Get.snackbar(
+        'Conference Unavailable',
+        'No active call found to add participants.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade600,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+      );
+      return false;
+    }
+
+    final currentUid = _authService.currentUserId;
+    if (targetUser.uid == currentUid) {
+      Get.snackbar(
+        'Invalid Action',
+        'You cannot invite yourself.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.amber.shade800,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+      );
+      return false;
+    }
+
+    try {
+      final inviteeName =
+          targetUser.name.isNotEmpty ? targetUser.name : 'User';
+
+      final bool sent = await ZegoUIKitPrebuiltCallInvitationService().send(
+        invitees: [
+          ZegoCallUser(targetUser.uid, inviteeName),
+        ],
+        isVideoCall: isVideo,
+        callID: currentRoomId,
+        timeoutSeconds: 60,
+      );
+
+      if (sent) {
+        Get.snackbar(
+          'Invitation Sent',
+          'Invited $inviteeName to join the conference.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: const Color(0xFF10B981),
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+        );
+        return true;
+      } else {
+        Get.snackbar(
+          'Call Failed',
+          'Unable to send conference invitation to $inviteeName.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade600,
+          colorText: Colors.white,
+          margin: const EdgeInsets.all(16),
+        );
+        return false;
+      }
+    } catch (e) {
+      debugPrint('inviteToOngoingCall error: $e');
+      return false;
     }
   }
 

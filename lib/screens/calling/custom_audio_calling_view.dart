@@ -6,6 +6,7 @@ import 'package:zego_uikit/zego_uikit.dart';
 import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 import '../../core/theme/app_theme.dart';
 import '../../routes/app_routes.dart';
+import 'invite_participant_sheet.dart';
 
 /// A custom, modular, voice-only calling overlay rendered on top of ZegoUIKitPrebuiltCall.
 ///
@@ -175,6 +176,7 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
   void _openDialpad() {
     showModalBottomSheet(
       context: context,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
@@ -277,87 +279,7 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
 
   // Open Conference / Add Call bottom sheet
   void _openAddCallModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF1E293B),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.group_add_rounded,
-                  color: AppTheme.primaryColor,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Conference Call',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Add more participants to convert this into a group voice call.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Multi-user conference calling is configured for Phase 7!'),
-                      backgroundColor: Color(0xFF1E293B),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.person_add_alt_1_rounded),
-                label: const Text('Invite Contact'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
+    InviteParticipantSheet.show(context, isVideo: false);
   }
 
   @override
@@ -833,12 +755,13 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
 
   // Smart hang up handling:
   // - Outgoing Ringing: cancels the outgoing call invitation
+  // - Conference call (3+ users): local user leaves room, others continue call
   // - 1-to-1 call: terminates session for both sides cleanly without over-popping
   void _handleHangUp(BuildContext context) {
     if (_isEnding) return;
-    _isEnding = true;
 
     if (widget.isOutgoingRinging) {
+      _isEnding = true;
       if (widget.onCancelCall != null) {
         widget.onCancelCall!();
       }
@@ -849,9 +772,33 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
     }
 
     if (Get.testMode) {
+      _isEnding = true;
       Navigator.of(context).maybePop();
       return;
     }
+
+    final remoteUsers = ZegoUIKit().getRemoteUsers();
+    if (remoteUsers.length > 1) {
+      // Multi-user Conference Call (3+ people):
+      // Only local user leaves the conference room so other participants can continue!
+      _isEnding = true;
+      try {
+        ZegoUIKit().leaveRoom();
+      } catch (e) {
+        debugPrint('leaveRoom conference exit error: $e');
+      }
+      if (mounted) {
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          Get.offAllNamed(AppRoutes.home);
+        }
+      }
+      return;
+    }
+
+    // 1-to-1 call or final 2 participants:
+    _isEnding = true;
     try {
       ZegoUIKitPrebuiltCallController().hangUp(context, showConfirmation: false);
     } catch (e) {
