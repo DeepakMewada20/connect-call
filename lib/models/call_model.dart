@@ -130,6 +130,7 @@ class CallModel {
   bool get isBusy => status.toLowerCase() == 'busy';
   bool get isConnected => status.toLowerCase() == 'connected';
   bool get isEnded => status.toLowerCase() == 'ended';
+  bool get isDisconnected => status.toLowerCase() == 'disconnected';
 
   // Get name of other participant relative to logged-in user
   String getOtherUserName(String? currentUid) {

@@ -236,6 +236,42 @@ class CallHistoryTile extends StatelessWidget {
       );
     }
 
+    if (call.isBusy) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          'Busy',
+          style: TextStyle(
+            color: Colors.orange.shade800,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
+    if (call.isDisconnected) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          'Disconnected',
+          style: TextStyle(
+            color: Colors.grey.shade700,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
     if (call.isFailed) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

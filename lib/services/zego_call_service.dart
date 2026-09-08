@@ -398,10 +398,14 @@ class ZegoCallService {
               if (duration < 0) duration = 0;
             }
 
+            final isDisconnected = event.reason == ZegoCallEndReason.kickOut ||
+                event.reason == ZegoCallEndReason.abandoned;
+            final endStatus = isDisconnected ? 'disconnected' : 'ended';
+
             if (endCallId.isNotEmpty) {
               await _callHistoryService.updateCallStatus(
                 callId: endCallId,
-                status: 'ended',
+                status: endStatus,
                 endedAt: DateTime.now(),
                 durationSeconds: duration,
               );

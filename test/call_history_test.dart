@@ -534,6 +534,37 @@ void main() {
       expect(find.text('Missed'), findsOneWidget);
       expect(find.byIcon(Icons.videocam_rounded), findsWidgets);
     });
+
+    testWidgets('Renders disconnected and busy calls with appropriate badges',
+        (tester) async {
+      final disconnectedCall = CallModel(
+        id: 'tile_3',
+        callerId: 'peer_3',
+        callerName: 'Alex Smith',
+        calleeId: 'user_me',
+        calleeName: 'Me',
+        callType: 'audio',
+        direction: 'incoming',
+        status: 'disconnected',
+        startedAt: DateTime.now(),
+        durationSeconds: 45,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CallHistoryTile(
+              call: disconnectedCall,
+              currentUserId: 'user_me',
+              onRedial: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Alex Smith'), findsOneWidget);
+      expect(find.text('Disconnected'), findsOneWidget);
+    });
   });
 
   group('CallsScreen Widget States Tests', () {
