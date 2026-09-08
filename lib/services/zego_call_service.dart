@@ -14,6 +14,7 @@ import '../models/zego_token_response.dart';
 import '../routes/app_routes.dart';
 import '../screens/calling/custom_audio_calling_view.dart';
 import '../screens/calling/invite_participant_sheet.dart';
+import '../screens/home/home_controller.dart';
 import 'auth_service.dart';
 import 'call_history_service.dart';
 import 'user_service.dart';
@@ -428,17 +429,20 @@ class ZegoCallService {
               try {
                 final nav = navigatorKey.currentState;
                 if (nav != null) {
-                  while (nav.canPop()) {
-                    nav.pop();
-                  }
+                  // Only unwind intermediate calling and modal dialog routes back to root HomeScreen
+                  nav.popUntil((route) => route.isFirst);
                 }
               } catch (e) {
-                debugPrint('nav pop error: $e');
+                debugPrint('nav popUntil error: $e');
               }
-              try {
+
+              // Ensure HomeController is alive
+              if (!Get.isRegistered<HomeController>()) {
+                Get.put(HomeController(), permanent: true);
+              }
+
+              if (Get.currentRoute != AppRoutes.home) {
                 Get.offAllNamed(AppRoutes.home);
-              } catch (e) {
-                debugPrint('Get.offAllNamed error: $e');
               }
             }
 

@@ -7,9 +7,9 @@ import 'home_controller.dart';
 class HomeBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<HomeController>(() => HomeController());
-    Get.lazyPut<ContactsController>(() => ContactsController());
-    Get.lazyPut<CallsController>(() => CallsController());
-    Get.lazyPut<ProfileController>(() => ProfileController());
+    Get.lazyPut<HomeController>(() => HomeController(), fenix: true);
+    Get.lazyPut<ContactsController>(() => ContactsController(), fenix: true);
+    Get.lazyPut<CallsController>(() => CallsController(), fenix: true);
+    Get.lazyPut<ProfileController>(() => ProfileController(), fenix: true);
   }
 }

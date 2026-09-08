@@ -7,15 +7,15 @@ import '../contacts/contacts_screen.dart';
 import '../profile/profile_screen.dart';
 import 'home_controller.dart';
 
-class HomeScreen extends GetView<HomeController> {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  HomeController get controller => Get.isRegistered<HomeController>()
+      ? Get.find<HomeController>()
+      : Get.put(HomeController(), permanent: true);
 
   @override
   Widget build(BuildContext context) {
-    // Ensure controller is registered
-    if (!Get.isRegistered<HomeController>()) {
-      Get.put(HomeController());
-    }
 
     final List<Widget> tabs = [
       _buildHomeDashboard(context),
