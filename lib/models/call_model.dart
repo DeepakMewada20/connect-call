@@ -134,7 +134,15 @@ class CallModel {
 
   // Get name of other participant relative to logged-in user
   String getOtherUserName(String? currentUid) {
-    if (currentUid != null && currentUid == callerId) {
+    if (currentUid != null && currentUid.isNotEmpty) {
+      if (currentUid == callerId) {
+        return calleeName.isNotEmpty ? calleeName : 'User';
+      } else {
+        return callerName.isNotEmpty ? callerName : 'User';
+      }
+    }
+    // Direction-based fallback if currentUid is not provided
+    if (isOutgoing) {
       return calleeName.isNotEmpty ? calleeName : 'User';
     }
     return callerName.isNotEmpty ? callerName : 'User';
@@ -142,7 +150,15 @@ class CallModel {
 
   // Get UID of other participant relative to logged-in user
   String getOtherUserId(String? currentUid) {
-    if (currentUid != null && currentUid == callerId) {
+    if (currentUid != null && currentUid.isNotEmpty) {
+      if (currentUid == callerId) {
+        return calleeId;
+      } else {
+        return callerId;
+      }
+    }
+    // Direction-based fallback if currentUid is not provided
+    if (isOutgoing) {
       return calleeId;
     }
     return callerId;
@@ -150,7 +166,15 @@ class CallModel {
 
   // Get photo of other participant relative to logged-in user
   String? getOtherUserPhoto(String? currentUid) {
-    if (currentUid != null && currentUid == callerId) {
+    if (currentUid != null && currentUid.isNotEmpty) {
+      if (currentUid == callerId) {
+        return calleePhoto;
+      } else {
+        return callerPhoto;
+      }
+    }
+    // Direction-based fallback if currentUid is not provided
+    if (isOutgoing) {
       return calleePhoto;
     }
     return callerPhoto;

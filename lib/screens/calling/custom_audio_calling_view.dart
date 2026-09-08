@@ -6,6 +6,7 @@ import 'package:zego_uikit/zego_uikit.dart';
 import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 import '../../core/theme/app_theme.dart';
 import '../../routes/app_routes.dart';
+import '../../services/auth_service.dart';
 import 'invite_participant_sheet.dart';
 
 /// A custom, modular, voice-only calling overlay rendered on top of ZegoUIKitPrebuiltCall.
@@ -284,22 +285,61 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
 
   @override
   Widget build(BuildContext context) {
-    // Resolve remote user display name from callingInfo, callData, or ZegoUIKit
+    // Resolve remote user display name from room users, callingInfo, or callData
     String remoteUserName = 'Connected User';
-    if (widget.callingInfo?.invitees.isNotEmpty ?? false) {
-      remoteUserName = widget.callingInfo!.invitees.first.name.trim();
-      if (remoteUserName.isEmpty) {
-        remoteUserName = widget.callingInfo!.invitees.first.id;
+    final currentUid = AuthService().currentUserId ?? ZegoUIKit().getLocalUser().id;
+
+    // 1. Check active remote users in room first
+    final remoteUsers = ZegoUIKit().getRemoteUsers();
+    if (remoteUsers.isNotEmpty) {
+      final validRemote = remoteUsers.firstWhere(
+        (u) => u.id != currentUid,
+        orElse: () => remoteUsers.first,
+      );
+      if (validRemote.name.trim().isNotEmpty) {
+        remoteUserName = validRemote.name.trim();
+      } else if (validRemote.id.trim().isNotEmpty) {
+        remoteUserName = validRemote.id.trim();
       }
-    } else if (widget.callData?.invitees.isNotEmpty ?? false) {
-      remoteUserName = widget.callData!.invitees.first.name.trim();
-      if (remoteUserName.isEmpty) {
-        remoteUserName = widget.callData!.invitees.first.id;
-      }
-    } else if (widget.callData?.inviter != null) {
-      remoteUserName = widget.callData!.inviter!.name.trim();
-      if (remoteUserName.isEmpty) {
-        remoteUserName = widget.callData!.inviter!.id;
+    }
+
+    // 2. If not in active room yet (e.g. ringing/connecting), resolve relative to currentUid
+    if (remoteUserName == 'Connected User') {
+      if (widget.callingInfo != null) {
+        final inviter = widget.callingInfo!.inviter;
+        final invitees = widget.callingInfo!.invitees;
+        if (inviter.id == currentUid && invitees.isNotEmpty) {
+          // Current user is caller -> other participant is invitee
+          remoteUserName = invitees.first.name.trim().isNotEmpty
+              ? invitees.first.name.trim()
+              : invitees.first.id;
+        } else {
+          // Current user is callee -> other participant is inviter
+          remoteUserName = inviter.name.trim().isNotEmpty
+              ? inviter.name.trim()
+              : inviter.id;
+        }
+      } else if (widget.callData != null) {
+        final inviter = widget.callData!.inviter;
+        final invitees = widget.callData!.invitees;
+        if (inviter != null && inviter.id == currentUid && invitees.isNotEmpty) {
+          // Current user is caller -> other participant is invitee
+          remoteUserName = invitees.first.name.trim().isNotEmpty
+              ? invitees.first.name.trim()
+              : invitees.first.id;
+        } else if (inviter != null && inviter.id != currentUid) {
+          // Current user is callee -> other participant is inviter
+          remoteUserName = inviter.name.trim().isNotEmpty
+              ? inviter.name.trim()
+              : inviter.id;
+        } else if (invitees.isNotEmpty) {
+          final other = invitees.firstWhere(
+            (u) => u.id != currentUid,
+            orElse: () => invitees.first,
+          );
+          remoteUserName =
+              other.name.trim().isNotEmpty ? other.name.trim() : other.id;
+        }
       }
     }
 
@@ -800,7 +840,8 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
     // 1-to-1 call or final 2 participants:
     _isEnding = true;
     try {
-      ZegoUIKitPrebuiltCallController().hangUp(context, showConfirmation: false);
+      final validContext = Get.context ?? context;
+      ZegoUIKitPrebuiltCallController().hangUp(validContext, showConfirmation: false);
     } catch (e) {
       debugPrint('hangUp controller error: $e');
       if (mounted) {

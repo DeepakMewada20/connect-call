@@ -422,17 +422,32 @@ class ZegoCallService {
               debugPrint('defaultAction error: $e');
             }
 
-            // Post-frame check: If the route stack was drained or not at home,
-            // recover cleanly to HomeScreen without interfering with the pop animation.
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              final nav = navigatorKey.currentState;
-              if (nav != null) {
-                if (!nav.canPop() && Get.currentRoute != AppRoutes.home) {
-                  Get.offAllNamed(AppRoutes.home);
+            // Cleanly pop any residual invitation / calling pages (e.g. ZegoCallingPage)
+            // back to the root HomeScreen to prevent blank/black screens on call termination.
+            void returnToHomeSafely() {
+              try {
+                final nav = navigatorKey.currentState;
+                if (nav != null) {
+                  while (nav.canPop()) {
+                    nav.pop();
+                  }
                 }
-              } else if (Get.currentRoute != AppRoutes.home) {
-                Get.offAllNamed(AppRoutes.home);
+              } catch (e) {
+                debugPrint('nav pop error: $e');
               }
+              try {
+                Get.offAllNamed(AppRoutes.home);
+              } catch (e) {
+                debugPrint('Get.offAllNamed error: $e');
+              }
+            }
+
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              returnToHomeSafely();
+            });
+
+            Future.delayed(const Duration(milliseconds: 100), () {
+              returnToHomeSafely();
             });
           },
         ),

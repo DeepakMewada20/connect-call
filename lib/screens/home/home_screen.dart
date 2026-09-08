@@ -368,6 +368,7 @@ class HomeScreen extends GetView<HomeController> {
             final call = controller.recentCalls[index];
             return CallHistoryTile(
               call: call,
+              currentUserId: controller.currentUid,
               onRedial: () => controller.redial(call),
             );
           },

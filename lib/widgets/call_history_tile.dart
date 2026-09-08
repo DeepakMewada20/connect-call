@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../models/call_model.dart';
+import '../services/auth_service.dart';
 
 /// CallHistoryTile renders a single call record item in the Call History list.
 class CallHistoryTile extends StatelessWidget {
@@ -19,8 +20,9 @@ class CallHistoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final otherName = call.getOtherUserName(currentUserId);
-    final otherPhoto = call.getOtherUserPhoto(currentUserId);
+    final effectiveUid = currentUserId ?? AuthService().currentUserId;
+    final otherName = call.getOtherUserName(effectiveUid);
+    final otherPhoto = call.getOtherUserPhoto(effectiveUid);
     final initial = otherName.isNotEmpty ? otherName[0].toUpperCase() : 'U';
 
     return Material(
