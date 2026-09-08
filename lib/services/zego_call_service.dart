@@ -9,6 +9,7 @@ import 'package:zego_uikit_signaling_plugin/zego_uikit_signaling_plugin.dart';
 import '../core/theme/app_theme.dart';
 import '../models/user_model.dart';
 import '../models/zego_token_response.dart';
+import '../routes/app_routes.dart';
 import '../screens/calling/custom_audio_calling_view.dart';
 import 'auth_service.dart';
 import 'user_service.dart';
@@ -127,6 +128,17 @@ class ZegoCallService {
         displayName = currentUser.email?.split('@').first ?? 'User';
       }
 
+      // Proactively request microphone and camera permissions so both caller and receiver
+      // can transmit audio and video without missing runtime OS permission prompts
+      try {
+        await [
+          Permission.microphone,
+          Permission.camera,
+        ].request();
+      } catch (e) {
+        debugPrint('Permissions request error: $e');
+      }
+
       // 3. Bind global navigator key
       ZegoUIKitPrebuiltCallInvitationService().setNavigatorKey(navigatorKey);
 
@@ -140,6 +152,26 @@ class ZegoCallService {
         uiConfig: ZegoCallInvitationUIConfig(
           inviter: ZegoCallInvitationInviterUIConfig(
             defaultCameraOn: true,
+            pageBuilder: (context, info) {
+              if (info.callType == ZegoCallInvitationType.videoCall) {
+                return null;
+              }
+              return CustomAudioCallingView(
+                isOutgoingRinging: true,
+                callingInfo: info,
+                onCancelCall: () async {
+                  try {
+                    await ZegoUIKitPrebuiltCallInvitationService().cancel(
+                      callees: info.invitees
+                          .map((u) => ZegoCallUser(u.id, u.name))
+                          .toList(),
+                    );
+                  } catch (e) {
+                    debugPrint('Error canceling outgoing call: $e');
+                  }
+                },
+              );
+            },
             backgroundBuilder: (context, size, info) {
               if (info.callType == ZegoCallInvitationType.videoCall) {
                 return null;
@@ -185,24 +217,38 @@ class ZegoCallService {
         events: ZegoUIKitPrebuiltCallEvents(
           onCallEnd: (ZegoCallEndEvent event, VoidCallback defaultAction) {
             debugPrint('ZegoCallService onCallEnd: ${event.reason}');
-            defaultAction();
-          },
-          user: ZegoCallUserEvents(
-            onLeave: (user) {
-              debugPrint('Remote user ${user.id} (${user.name}) left the call.');
-              final context = navigatorKey.currentContext ?? Get.context;
-              if (context != null && context.mounted) {
-                try {
-                  ZegoUIKitPrebuiltCallController().hangUp(context);
-                } catch (e) {
-                  debugPrint('Auto hangup on user leave: $e');
+            isCalling.value = false;
+            activeCallId.value = '';
+
+            try {
+              defaultAction();
+            } catch (e) {
+              debugPrint('defaultAction error: $e');
+            }
+
+            // Post-frame check: If the route stack was drained or not at home,
+            // recover cleanly to HomeScreen without interfering with the pop animation.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              final nav = navigatorKey.currentState;
+              if (nav != null) {
+                if (!nav.canPop() && Get.currentRoute != AppRoutes.home) {
+                  Get.offAllNamed(AppRoutes.home);
                 }
+              } else if (Get.currentRoute != AppRoutes.home) {
+                Get.offAllNamed(AppRoutes.home);
               }
-            },
-          ),
+            });
+          },
         ),
         requireConfig: (ZegoCallInvitationData data) {
           if (data.type == ZegoCallInvitationType.videoCall) {
+            // Proactively ensure camera is permitted and turned on for receiver
+            Permission.camera.request().then((status) {
+              if (status.isGranted) {
+                ZegoUIKit().turnCameraOn(true);
+              }
+            });
+
             // Phase 7: Functional 1-to-1 Video Calling UI
             final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVideoCall();
             config.turnOnCameraWhenJoining = true;
@@ -230,11 +276,13 @@ class ZegoCallService {
           // Phase 6: 1-to-1 Audio Calling with custom modular UI
           final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall();
           config.turnOnCameraWhenJoining = false;
-          config.useSpeakerWhenJoining = false;
+          config.turnOnMicrophoneWhenJoining = true;
+          config.useSpeakerWhenJoining = true;
           config.topMenuBar.isVisible = false;
           config.bottomMenuBar.buttons = [];
           config.audioVideoView.showCameraStateOnView = false;
           config.audioVideoView.showSoundWavesInAudioMode = true;
+          config.audioVideoView.showAvatarInAudioMode = true;
           config.foreground = CustomAudioCallingView(callData: data);
           return config;
         },

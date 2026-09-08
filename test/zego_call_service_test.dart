@@ -190,5 +190,38 @@ void main() {
 
       expect(find.text('123'), findsOneWidget);
     });
+
+    testWidgets('CustomAudioCallingView in outgoing ringing mode displays Ringing... and Calling...', (tester) async {
+      bool cancelCalled = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: CustomAudioCallingView(
+            isOutgoingRinging: true,
+            onCancelCall: () {
+              cancelCalled = true;
+            },
+          ),
+        ),
+      );
+
+      // Verify Ringing status and Calling... in duration header
+      expect(find.text('Ringing...'), findsOneWidget);
+      expect(find.text('Calling...'), findsOneWidget);
+
+      // Verify action buttons exist in dimmed grid
+      expect(find.text('Mute'), findsOneWidget);
+      expect(find.text('Speaker'), findsOneWidget);
+
+      // Tapping action button shows feedback toast
+      await tester.tap(find.text('Keypad'));
+      await tester.pump();
+      expect(find.text('Features available once call is connected'), findsOneWidget);
+
+      // Tapping Hang Up triggers onCancelCall
+      await tester.tap(find.byIcon(Icons.call_end_rounded));
+      await tester.pump();
+      expect(cancelCalled, isTrue);
+    });
   });
 }

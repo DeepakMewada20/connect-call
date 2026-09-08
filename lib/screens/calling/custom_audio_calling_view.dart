@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:zego_uikit/zego_uikit.dart';
 import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 import '../../core/theme/app_theme.dart';
+import '../../routes/app_routes.dart';
 
 /// A custom, modular, voice-only calling overlay rendered on top of ZegoUIKitPrebuiltCall.
 ///
@@ -21,10 +23,16 @@ import '../../core/theme/app_theme.dart';
 /// - Circular Red Hang Up button (clean session termination)
 class CustomAudioCallingView extends StatefulWidget {
   final ZegoCallInvitationData? callData;
+  final bool isOutgoingRinging;
+  final ZegoCallingBuilderInfo? callingInfo;
+  final VoidCallback? onCancelCall;
 
   const CustomAudioCallingView({
     super.key,
     this.callData,
+    this.isOutgoingRinging = false,
+    this.callingInfo,
+    this.onCancelCall,
   });
 
   @override
@@ -48,8 +56,8 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
   bool _isOnHold = false;
   String _enteredDigits = '';
 
-  // Remote participants listener
-  StreamSubscription<List<ZegoUIKitUser>>? _userLeaveSubscription;
+  // Single-execution guard to prevent duplicate hangup and over-popping
+  bool _isEnding = false;
 
   @override
   void initState() {
@@ -69,8 +77,8 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // 2. Start call duration counter
-    if (!Get.testMode) {
+    // 2. Start call duration counter only when call is connected
+    if (!Get.testMode && !widget.isOutgoingRinging) {
       _durationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
         if (mounted) {
           setState(() {
@@ -79,14 +87,10 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
         }
       });
 
-      // 3. Listen for remote participants leaving the call
-      _userLeaveSubscription = ZegoUIKit().getUserLeaveStream().listen((users) {
-        if (mounted) {
-          final remainingRemoteUsers = ZegoUIKit().getRemoteUsers();
-          if (remainingRemoteUsers.isEmpty) {
-            // All remote participants have left the call
-            ZegoUIKitPrebuiltCallController().hangUp(context);
-          }
+      // Ensure microphone is granted and turned on
+      Permission.microphone.request().then((status) {
+        if (status.isGranted) {
+          ZegoUIKit().turnMicrophoneOn(true);
         }
       });
     }
@@ -96,7 +100,6 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
   void dispose() {
     _durationTimer?.cancel();
     _recordTimer?.cancel();
-    _userLeaveSubscription?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -359,9 +362,14 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
 
   @override
   Widget build(BuildContext context) {
-    // Resolve remote user display name from invitation data or ZegoUIKit
+    // Resolve remote user display name from callingInfo, callData, or ZegoUIKit
     String remoteUserName = 'Connected User';
-    if (widget.callData?.invitees.isNotEmpty ?? false) {
+    if (widget.callingInfo?.invitees.isNotEmpty ?? false) {
+      remoteUserName = widget.callingInfo!.invitees.first.name.trim();
+      if (remoteUserName.isEmpty) {
+        remoteUserName = widget.callingInfo!.invitees.first.id;
+      }
+    } else if (widget.callData?.invitees.isNotEmpty ?? false) {
       remoteUserName = widget.callData!.invitees.first.name.trim();
       if (remoteUserName.isEmpty) {
         remoteUserName = widget.callData!.invitees.first.id;
@@ -399,40 +407,33 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
                 physics: const ClampingScrollPhysics(),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: IntrinsicHeight(
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 12),
-
-                        // 1. Top Bar: Encryption indicator + live duration
-                        _buildTopHeader(),
-
-                        const Spacer(),
-
-                        // 2. Center Profile & Pulsing Sound Waves
-                        _buildCenterProfile(remoteUserName, initial),
-
-                        const Spacer(),
-
-                        // 3. Status Badges (Hold / Recording)
-                        if (_isOnHold || _isRecording) ...[
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(height: 8),
+                          _buildTopHeader(),
                           const SizedBox(height: 12),
-                          _buildStatusBanner(),
+                          _buildCenterProfile(remoteUserName, initial),
+                          if (_isOnHold || _isRecording) ...[
+                            const SizedBox(height: 8),
+                            _buildStatusBanner(),
+                          ],
                         ],
-
-                        const SizedBox(height: 16),
-
-                        // 4. Modular Action Button Grid (2x3)
-                        _buildModularActionGrid(),
-
-                        const SizedBox(height: 28),
-
-                        // 5. Hang Up Button
-                        _buildHangUpSection(),
-
-                        const SizedBox(height: 20),
-                      ],
-                    ),
+                      ),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(height: 12),
+                          _buildModularActionGrid(),
+                          const SizedBox(height: 20),
+                          _buildHangUpSection(),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -480,7 +481,9 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              _formatDuration(_callDurationSeconds),
+              widget.isOutgoingRinging
+                  ? 'Calling...'
+                  : _formatDuration(_callDurationSeconds),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
@@ -503,15 +506,15 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
         ScaleTransition(
           scale: _pulseAnimation,
           child: Container(
-            width: 140,
-            height: 140,
+            width: 116,
+            height: 116,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
                   color: AppTheme.primaryColor.withValues(alpha: 0.28),
-                  blurRadius: 36,
-                  spreadRadius: 8,
+                  blurRadius: 28,
+                  spreadRadius: 6,
                 ),
               ],
             ),
@@ -534,7 +537,7 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
                   initial,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 54,
+                    fontSize: 44,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -542,7 +545,7 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
             ),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 14),
         Text(
           name,
           style: const TextStyle(
@@ -554,9 +557,13 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
         ),
         const SizedBox(height: 6),
         Text(
-          _isOnHold ? 'Call on hold' : 'Voice Call in progress',
+          widget.isOutgoingRinging
+              ? 'Ringing...'
+              : (_isOnHold ? 'Call on hold' : 'Voice Call in progress'),
           style: TextStyle(
-            color: _isOnHold ? Colors.amber.shade300 : const Color(0xFF10B981),
+            color: widget.isOutgoingRinging
+                ? Colors.amber.shade300
+                : (_isOnHold ? Colors.amber.shade300 : const Color(0xFF10B981)),
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),
@@ -628,78 +635,112 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
 
   // Modular 2x3 Action Grid
   Widget _buildModularActionGrid() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Column(
-        children: [
-          // Row 1: Mute, Keypad, Speaker
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // 1. Mute Button (Hardware linked)
-              _buildZegoActionButton(
-                label: 'Mute',
-                child: ZegoToggleMicrophoneButton(
-                  buttonSize: const Size(60, 60),
-                  iconSize: const Size(28, 28),
-                  defaultOn: true,
+    return Opacity(
+      opacity: widget.isOutgoingRinging ? 0.45 : 1.0,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          children: [
+            // Row 1: Mute, Keypad, Speaker
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // 1. Mute Button (Hardware linked when connected, dimmed when ringing)
+                widget.isOutgoingRinging
+                    ? _buildCustomActionButton(
+                        icon: Icons.mic_rounded,
+                        label: 'Mute',
+                        isActive: false,
+                        onTap: () => _notifyDisabledWhileRinging(),
+                      )
+                    : _buildZegoActionButton(
+                        label: 'Mute',
+                        child: ZegoToggleMicrophoneButton(
+                          buttonSize: const Size(60, 60),
+                          iconSize: const Size(28, 28),
+                          defaultOn: true,
+                        ),
+                      ),
+
+                // 2. Keypad / Dialpad (Interactive modal)
+                _buildCustomActionButton(
+                  icon: Icons.dialpad_rounded,
+                  label: 'Keypad',
+                  isActive: false,
+                  onTap: widget.isOutgoingRinging
+                      ? () => _notifyDisabledWhileRinging()
+                      : _openDialpad,
                 ),
-              ),
 
-              // 2. Keypad / Dialpad (Interactive modal)
-              _buildCustomActionButton(
-                icon: Icons.dialpad_rounded,
-                label: 'Keypad',
-                isActive: false,
-                onTap: _openDialpad,
-              ),
+                // 3. Speaker Output (Hardware linked when connected, dimmed when ringing)
+                widget.isOutgoingRinging
+                    ? _buildCustomActionButton(
+                        icon: Icons.volume_up_rounded,
+                        label: 'Speaker',
+                        isActive: false,
+                        onTap: () => _notifyDisabledWhileRinging(),
+                      )
+                    : _buildZegoActionButton(
+                        label: 'Speaker',
+                        child: ZegoSwitchAudioOutputButton(
+                          buttonSize: const Size(60, 60),
+                          iconSize: const Size(28, 28),
+                          defaultUseSpeaker: true,
+                        ),
+                      ),
+              ],
+            ),
 
-              // 3. Speaker Output (Hardware linked)
-              _buildZegoActionButton(
-                label: 'Speaker',
-                child: ZegoSwitchAudioOutputButton(
-                  buttonSize: const Size(60, 60),
-                  iconSize: const Size(28, 28),
-                  defaultUseSpeaker: false,
+            const SizedBox(height: 20),
+
+            // Row 2: Record, Add Call, Hold
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // 4. Call Recording Button
+                _buildCustomActionButton(
+                  icon: Icons.fiber_manual_record_rounded,
+                  label: _isRecording ? 'Stop Rec' : 'Record',
+                  isActive: _isRecording,
+                  activeColor: Colors.redAccent,
+                  onTap: widget.isOutgoingRinging
+                      ? () => _notifyDisabledWhileRinging()
+                      : _toggleRecording,
                 ),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 20),
+                // 5. Add Call / Conference (Modal Hook)
+                _buildCustomActionButton(
+                  icon: Icons.person_add_alt_1_rounded,
+                  label: 'Add call',
+                  isActive: false,
+                  onTap: widget.isOutgoingRinging
+                      ? () => _notifyDisabledWhileRinging()
+                      : _openAddCallModal,
+                ),
 
-          // Row 2: Record, Add Call, Hold
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // 4. Call Recording Button
-              _buildCustomActionButton(
-                icon: Icons.fiber_manual_record_rounded,
-                label: _isRecording ? 'Stop Rec' : 'Record',
-                isActive: _isRecording,
-                activeColor: Colors.redAccent,
-                onTap: _toggleRecording,
-              ),
+                // 6. Hold Call Button
+                _buildCustomActionButton(
+                  icon: _isOnHold ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                  label: _isOnHold ? 'Unhold' : 'Hold',
+                  isActive: _isOnHold,
+                  activeColor: Colors.amber,
+                  onTap: widget.isOutgoingRinging
+                      ? () => _notifyDisabledWhileRinging()
+                      : _toggleHold,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              // 5. Add Call / Conference (Modal Hook)
-              _buildCustomActionButton(
-                icon: Icons.person_add_alt_1_rounded,
-                label: 'Add call',
-                isActive: false,
-                onTap: _openAddCallModal,
-              ),
-
-              // 6. Hold Call Button
-              _buildCustomActionButton(
-                icon: _isOnHold ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                label: _isOnHold ? 'Unhold' : 'Hold',
-                isActive: _isOnHold,
-                activeColor: Colors.amber,
-                onTap: _toggleHold,
-              ),
-            ],
-          ),
-        ],
+  void _notifyDisabledWhileRinging() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Features available once call is connected'),
+        duration: Duration(milliseconds: 1200),
       ),
     );
   }
@@ -791,21 +832,37 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
   }
 
   // Smart hang up handling:
-  // - 1-to-1 call: terminates session for both sides
-  // - Conference call: leaves room and allows others to stay
+  // - Outgoing Ringing: cancels the outgoing call invitation
+  // - 1-to-1 call: terminates session for both sides cleanly without over-popping
   void _handleHangUp(BuildContext context) {
+    if (_isEnding) return;
+    _isEnding = true;
+
+    if (widget.isOutgoingRinging) {
+      if (widget.onCancelCall != null) {
+        widget.onCancelCall!();
+      }
+      if (mounted) {
+        Navigator.of(context).maybePop();
+      }
+      return;
+    }
+
     if (Get.testMode) {
       Navigator.of(context).maybePop();
       return;
     }
-    final remoteUsers = ZegoUIKit().getRemoteUsers();
-    if (remoteUsers.length <= 1) {
-      // 1-to-1 call: End call for both sides
-      ZegoUIKitPrebuiltCallController().hangUp(context);
-    } else {
-      // Conference call: Only leave the room so others can stay
-      ZegoUIKit().leaveRoom();
-      Navigator.of(context).maybePop();
+    try {
+      ZegoUIKitPrebuiltCallController().hangUp(context, showConfirmation: false);
+    } catch (e) {
+      debugPrint('hangUp controller error: $e');
+      if (mounted) {
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          Get.offAllNamed(AppRoutes.home);
+        }
+      }
     }
   }
 
