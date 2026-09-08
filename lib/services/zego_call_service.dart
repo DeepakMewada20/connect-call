@@ -179,6 +179,12 @@ class ZegoCallService {
             },
           ),
         ),
+        events: ZegoUIKitPrebuiltCallEvents(
+          onCallEnd: (ZegoCallEndEvent event, VoidCallback defaultAction) {
+            debugPrint('ZegoCallService onCallEnd: ${event.reason}');
+            defaultAction();
+          },
+        ),
         requireConfig: (ZegoCallInvitationData data) {
           // Phase 6 is 1-to-1 Audio Calling with custom modular UI
           final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall();

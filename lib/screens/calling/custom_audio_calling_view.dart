@@ -48,6 +48,9 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
   bool _isOnHold = false;
   String _enteredDigits = '';
 
+  // Remote participants listener
+  StreamSubscription<List<ZegoUIKitUser>>? _userLeaveSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -75,6 +78,17 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
           });
         }
       });
+
+      // 3. Listen for remote participants leaving the call
+      _userLeaveSubscription = ZegoUIKit().getUserLeaveStream().listen((users) {
+        if (mounted) {
+          final remainingRemoteUsers = ZegoUIKit().getRemoteUsers();
+          if (remainingRemoteUsers.isEmpty) {
+            // All remote participants have left the call
+            ZegoUIKitPrebuiltCallController().hangUp(context);
+          }
+        }
+      });
     }
   }
 
@@ -82,6 +96,7 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
   void dispose() {
     _durationTimer?.cancel();
     _recordTimer?.cancel();
+    _userLeaveSubscription?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -775,29 +790,54 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
     );
   }
 
+  // Smart hang up handling:
+  // - 1-to-1 call: terminates session for both sides
+  // - Conference call: leaves room and allows others to stay
+  void _handleHangUp(BuildContext context) {
+    if (Get.testMode) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    final remoteUsers = ZegoUIKit().getRemoteUsers();
+    if (remoteUsers.length <= 1) {
+      // 1-to-1 call: End call for both sides
+      ZegoUIKitPrebuiltCallController().hangUp(context);
+    } else {
+      // Conference call: Only leave the room so others can stay
+      ZegoUIKit().leaveRoom();
+      Navigator.of(context).maybePop();
+    }
+  }
+
   // Red Hang Up Button
   Widget _buildHangUpSection() {
     return Center(
-      child: Container(
-        width: 72,
-        height: 72,
-        decoration: const BoxDecoration(
-          color: Colors.redAccent,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _handleHangUp(context),
+          borderRadius: BorderRadius.circular(36),
+          child: Container(
+            width: 72,
+            height: 72,
+            decoration: const BoxDecoration(
               color: Colors.redAccent,
-              blurRadius: 24,
-              spreadRadius: 2,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.redAccent,
+                  blurRadius: 24,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
-          ],
-        ),
-        child: ZegoLeaveButton(
-          buttonSize: const Size(72, 72),
-          iconSize: const Size(36, 36),
-          icon: ButtonIcon(
-            icon: const Icon(Icons.call_end_rounded, color: Colors.white, size: 36),
-            backgroundColor: Colors.transparent,
+            child: const Center(
+              child: Icon(
+                Icons.call_end_rounded,
+                color: Colors.white,
+                size: 36,
+              ),
+            ),
           ),
         ),
       ),
