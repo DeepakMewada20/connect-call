@@ -8,12 +8,14 @@ import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 import 'package:zego_uikit_signaling_plugin/zego_uikit_signaling_plugin.dart';
 
 import '../core/theme/app_theme.dart';
+import '../models/call_model.dart';
 import '../models/user_model.dart';
 import '../models/zego_token_response.dart';
 import '../routes/app_routes.dart';
 import '../screens/calling/custom_audio_calling_view.dart';
 import '../screens/calling/invite_participant_sheet.dart';
 import 'auth_service.dart';
+import 'call_history_service.dart';
 import 'user_service.dart';
 
 /// ZegoCallService manages 1-to-1 audio calling via ZEGOCLOUD Call Kit.
@@ -27,14 +29,17 @@ class ZegoCallService {
   final FirebaseFunctions? _injectedFunctions;
   final AuthService? _injectedAuthService;
   final UserService? _injectedUserService;
+  final CallHistoryService? _injectedCallHistoryService;
 
   ZegoCallService({
     FirebaseFunctions? functions,
     AuthService? authService,
     UserService? userService,
+    CallHistoryService? callHistoryService,
   })  : _injectedFunctions = functions,
         _injectedAuthService = authService,
-        _injectedUserService = userService;
+        _injectedUserService = userService,
+        _injectedCallHistoryService = callHistoryService;
 
   static final ZegoCallService instance = ZegoCallService();
 
@@ -48,6 +53,8 @@ class ZegoCallService {
       _injectedAuthService ?? AuthService();
   UserService get _userService =>
       _injectedUserService ?? UserService();
+  CallHistoryService get _callHistoryService =>
+      _injectedCallHistoryService ?? CallHistoryService.instance;
 
   // Reactive state observables
   final RxBool isInitialized = false.obs;
@@ -55,6 +62,14 @@ class ZegoCallService {
   final RxString activeCallId = ''.obs;
 
   String? _initializedUserId;
+
+  // Active call session tracking for Call History
+  String? _currentSessionCallId;
+  DateTime? _callConnectedAt;
+  bool _currentSessionIsVideo = false;
+  String? _currentSessionTargetUid;
+  String? _currentSessionTargetName;
+  String? _currentSessionTargetPhoto;
 
   /// Request a secure temporary session token from the Firebase Cloud Function
   Future<ZegoTokenResponse> getZegoToken() async {
@@ -222,9 +237,178 @@ class ZegoCallService {
             },
           ),
         ),
+        invitationEvents: ZegoUIKitPrebuiltCallInvitationEvents(
+          onOutgoingCallSent: (callID, caller, callType, callees, customData) async {
+            _currentSessionCallId = callID;
+            activeCallId.value = callID;
+            _callConnectedAt = null;
+            _currentSessionIsVideo = callType == ZegoCallInvitationType.videoCall;
+
+            final targetUser = callees.isNotEmpty ? callees.first : null;
+            _currentSessionTargetUid = targetUser?.id ?? '';
+            _currentSessionTargetName = targetUser?.name.isNotEmpty ?? false ? targetUser!.name : 'User';
+
+            final currentUid = _authService.currentUserId ?? caller.id;
+            final currentName = caller.name.isNotEmpty
+                ? caller.name
+                : (_authService.getCurrentUser()?.displayName ?? 'User');
+
+            await _callHistoryService.saveCallRecord(
+              CallModel(
+                id: callID,
+                callerId: currentUid,
+                callerName: currentName,
+                callerPhoto: _authService.getCurrentUser()?.photoURL,
+                calleeId: _currentSessionTargetUid ?? '',
+                calleeName: _currentSessionTargetName ?? 'User',
+                calleePhoto: _currentSessionTargetPhoto,
+                callType: _currentSessionIsVideo ? 'video' : 'audio',
+                direction: 'outgoing',
+                status: 'calling',
+                startedAt: DateTime.now(),
+                durationSeconds: 0,
+              ),
+            );
+          },
+          onIncomingCallReceived: (callID, caller, callType, callees, customData) async {
+            _currentSessionCallId = callID;
+            activeCallId.value = callID;
+            _callConnectedAt = null;
+            _currentSessionIsVideo = callType == ZegoCallInvitationType.videoCall;
+
+            _currentSessionTargetUid = caller.id;
+            _currentSessionTargetName = caller.name.isNotEmpty ? caller.name : 'User';
+
+            final currentUid = _authService.currentUserId ?? '';
+            final currentName = _authService.getCurrentUser()?.displayName ?? 'User';
+
+            await _callHistoryService.saveCallRecord(
+              CallModel(
+                id: callID,
+                callerId: caller.id,
+                callerName: caller.name.isNotEmpty ? caller.name : 'User',
+                calleeId: currentUid,
+                calleeName: currentName,
+                calleePhoto: _authService.getCurrentUser()?.photoURL,
+                callType: _currentSessionIsVideo ? 'video' : 'audio',
+                direction: 'incoming',
+                status: 'calling',
+                startedAt: DateTime.now(),
+                durationSeconds: 0,
+              ),
+            );
+          },
+          onOutgoingCallAccepted: (callID, callee) async {
+            _callConnectedAt ??= DateTime.now();
+            await _callHistoryService.updateCallStatus(
+              callId: callID,
+              status: 'connected',
+            );
+          },
+          onIncomingCallAcceptButtonPressed: () async {
+            _callConnectedAt ??= DateTime.now();
+            final targetCallId = activeCallId.value.isNotEmpty
+                ? activeCallId.value
+                : (_currentSessionCallId ?? '');
+            if (targetCallId.isNotEmpty) {
+              await _callHistoryService.updateCallStatus(
+                callId: targetCallId,
+                status: 'connected',
+              );
+            }
+          },
+          onOutgoingCallDeclined: (callID, callee, customData) async {
+            await _callHistoryService.updateCallStatus(
+              callId: callID,
+              status: 'rejected',
+              endedAt: DateTime.now(),
+              durationSeconds: 0,
+            );
+          },
+          onOutgoingCallRejectedCauseBusy: (callID, callee, customData) async {
+            await _callHistoryService.updateCallStatus(
+              callId: callID,
+              status: 'busy',
+              endedAt: DateTime.now(),
+              durationSeconds: 0,
+            );
+          },
+          onIncomingCallDeclineButtonPressed: () async {
+            final targetCallId = activeCallId.value.isNotEmpty
+                ? activeCallId.value
+                : (_currentSessionCallId ?? '');
+            if (targetCallId.isNotEmpty) {
+              await _callHistoryService.updateCallStatus(
+                callId: targetCallId,
+                status: 'rejected',
+                endedAt: DateTime.now(),
+                durationSeconds: 0,
+              );
+            }
+          },
+          onIncomingCallTimeout: (callID, caller) async {
+            await _callHistoryService.updateCallStatus(
+              callId: callID,
+              status: 'missed',
+              endedAt: DateTime.now(),
+              durationSeconds: 0,
+            );
+          },
+          onIncomingCallCanceled: (callID, caller, customData) async {
+            await _callHistoryService.updateCallStatus(
+              callId: callID,
+              status: 'missed',
+              endedAt: DateTime.now(),
+              durationSeconds: 0,
+            );
+          },
+          onOutgoingCallTimeout: (callID, callees, isVideoCall) async {
+            await _callHistoryService.updateCallStatus(
+              callId: callID,
+              status: 'missed',
+              endedAt: DateTime.now(),
+              durationSeconds: 0,
+            );
+          },
+          onOutgoingCallCancelButtonPressed: () async {
+            final targetCallId = activeCallId.value.isNotEmpty
+                ? activeCallId.value
+                : (_currentSessionCallId ?? '');
+            if (targetCallId.isNotEmpty) {
+              await _callHistoryService.updateCallStatus(
+                callId: targetCallId,
+                status: 'ended',
+                endedAt: DateTime.now(),
+                durationSeconds: 0,
+              );
+            }
+          },
+        ),
         events: ZegoUIKitPrebuiltCallEvents(
-          onCallEnd: (ZegoCallEndEvent event, VoidCallback defaultAction) {
+          onCallEnd: (ZegoCallEndEvent event, VoidCallback defaultAction) async {
             debugPrint('ZegoCallService onCallEnd: ${event.reason}');
+
+            final endCallId = activeCallId.value.isNotEmpty
+                ? activeCallId.value
+                : (_currentSessionCallId ?? ZegoUIKit().getRoom().id);
+
+            int duration = 0;
+            if (_callConnectedAt != null) {
+              duration = DateTime.now().difference(_callConnectedAt!).inSeconds;
+              if (duration < 0) duration = 0;
+            }
+
+            if (endCallId.isNotEmpty) {
+              await _callHistoryService.updateCallStatus(
+                callId: endCallId,
+                status: 'ended',
+                endedAt: DateTime.now(),
+                durationSeconds: duration,
+              );
+            }
+
+            _callConnectedAt = null;
+            _currentSessionCallId = null;
             isCalling.value = false;
             activeCallId.value = '';
 
@@ -250,6 +434,13 @@ class ZegoCallService {
         ),
         requireConfig: (ZegoCallInvitationData data) {
           activeCallId.value = data.callID;
+          _callConnectedAt ??= DateTime.now();
+          if (data.callID.isNotEmpty) {
+            _callHistoryService.updateCallStatus(
+              callId: data.callID,
+              status: 'connected',
+            );
+          }
           final isGroup = data.invitees.length > 1;
 
           if (data.type == ZegoCallInvitationType.videoCall) {
@@ -441,6 +632,24 @@ class ZegoCallService {
     required UserModel targetUser,
   }) async {
     if (Get.testMode) {
+      final currentUid = _authService.currentUserId ?? 'test_caller_uid';
+      final callID = 'call_${currentUid}_${DateTime.now().millisecondsSinceEpoch}';
+      await _callHistoryService.saveCallRecord(
+        CallModel(
+          id: callID,
+          callerId: currentUid,
+          callerName: _authService.getCurrentUser()?.displayName ?? 'Tester',
+          callerPhoto: _authService.getCurrentUser()?.photoURL,
+          calleeId: targetUser.uid,
+          calleeName: targetUser.name,
+          calleePhoto: targetUser.profileImage.isNotEmpty ? targetUser.profileImage : null,
+          callType: 'audio',
+          direction: 'outgoing',
+          status: 'calling',
+          startedAt: DateTime.now(),
+          durationSeconds: 0,
+        ),
+      );
       return true;
     }
 
@@ -503,19 +712,54 @@ class ZegoCallService {
     }
 
     isCalling.value = true;
+    final inviteeName =
+        targetUser.name.isNotEmpty ? targetUser.name : 'User';
+    final currentName = _authService.getCurrentUser()?.displayName ?? 'User';
+    final callID = 'call_${currentUid}_${DateTime.now().millisecondsSinceEpoch}';
+    _currentSessionCallId = callID;
+    activeCallId.value = callID;
+    _callConnectedAt = null;
+    _currentSessionIsVideo = false;
+    _currentSessionTargetUid = targetUser.uid;
+    _currentSessionTargetName = inviteeName;
+    _currentSessionTargetPhoto =
+        targetUser.profileImage.isNotEmpty ? targetUser.profileImage : null;
+
     try {
-      final inviteeName =
-          targetUser.name.isNotEmpty ? targetUser.name : 'User';
+      // Save initial outgoing call record
+      await _callHistoryService.saveCallRecord(
+        CallModel(
+          id: callID,
+          callerId: currentUid,
+          callerName: currentName,
+          callerPhoto: _authService.getCurrentUser()?.photoURL,
+          calleeId: targetUser.uid,
+          calleeName: inviteeName,
+          calleePhoto: _currentSessionTargetPhoto,
+          callType: 'audio',
+          direction: 'outgoing',
+          status: 'calling',
+          startedAt: DateTime.now(),
+          durationSeconds: 0,
+        ),
+      );
 
       final bool sent = await ZegoUIKitPrebuiltCallInvitationService().send(
         invitees: [
           ZegoCallUser(targetUser.uid, inviteeName),
         ],
         isVideoCall: false, // Strict Phase 6 Requirement: AUDIO ONLY
+        callID: callID,
         timeoutSeconds: 60,
       );
 
       if (!sent) {
+        await _callHistoryService.updateCallStatus(
+          callId: callID,
+          status: 'failed',
+          endedAt: DateTime.now(),
+          durationSeconds: 0,
+        );
         Get.snackbar(
           'Call Failed',
           'Unable to send call invitation to $inviteeName. Please try again.',
@@ -528,6 +772,12 @@ class ZegoCallService {
       return sent;
     } catch (e) {
       debugPrint('sendAudioCallInvitation error: $e');
+      await _callHistoryService.updateCallStatus(
+        callId: callID,
+        status: 'failed',
+        endedAt: DateTime.now(),
+        durationSeconds: 0,
+      );
       Get.snackbar(
         'Call Error',
         'An unexpected error occurred while placing the call.',
@@ -547,6 +797,24 @@ class ZegoCallService {
     required UserModel targetUser,
   }) async {
     if (Get.testMode) {
+      final currentUid = _authService.currentUserId ?? 'test_caller_uid';
+      final callID = 'call_${currentUid}_${DateTime.now().millisecondsSinceEpoch}';
+      await _callHistoryService.saveCallRecord(
+        CallModel(
+          id: callID,
+          callerId: currentUid,
+          callerName: _authService.getCurrentUser()?.displayName ?? 'Tester',
+          callerPhoto: _authService.getCurrentUser()?.photoURL,
+          calleeId: targetUser.uid,
+          calleeName: targetUser.name,
+          calleePhoto: targetUser.profileImage.isNotEmpty ? targetUser.profileImage : null,
+          callType: 'video',
+          direction: 'outgoing',
+          status: 'calling',
+          startedAt: DateTime.now(),
+          durationSeconds: 0,
+        ),
+      );
       return true;
     }
 
@@ -609,19 +877,54 @@ class ZegoCallService {
     }
 
     isCalling.value = true;
+    final inviteeName =
+        targetUser.name.isNotEmpty ? targetUser.name : 'User';
+    final currentName = _authService.getCurrentUser()?.displayName ?? 'User';
+    final callID = 'call_${currentUid}_${DateTime.now().millisecondsSinceEpoch}';
+    _currentSessionCallId = callID;
+    activeCallId.value = callID;
+    _callConnectedAt = null;
+    _currentSessionIsVideo = true;
+    _currentSessionTargetUid = targetUser.uid;
+    _currentSessionTargetName = inviteeName;
+    _currentSessionTargetPhoto =
+        targetUser.profileImage.isNotEmpty ? targetUser.profileImage : null;
+
     try {
-      final inviteeName =
-          targetUser.name.isNotEmpty ? targetUser.name : 'User';
+      // Save initial outgoing call record
+      await _callHistoryService.saveCallRecord(
+        CallModel(
+          id: callID,
+          callerId: currentUid,
+          callerName: currentName,
+          callerPhoto: _authService.getCurrentUser()?.photoURL,
+          calleeId: targetUser.uid,
+          calleeName: inviteeName,
+          calleePhoto: _currentSessionTargetPhoto,
+          callType: 'video',
+          direction: 'outgoing',
+          status: 'calling',
+          startedAt: DateTime.now(),
+          durationSeconds: 0,
+        ),
+      );
 
       final bool sent = await ZegoUIKitPrebuiltCallInvitationService().send(
         invitees: [
           ZegoCallUser(targetUser.uid, inviteeName),
         ],
         isVideoCall: true, // Strict Phase 7 Requirement: VIDEO CALL
+        callID: callID,
         timeoutSeconds: 60,
       );
 
       if (!sent) {
+        await _callHistoryService.updateCallStatus(
+          callId: callID,
+          status: 'failed',
+          endedAt: DateTime.now(),
+          durationSeconds: 0,
+        );
         Get.snackbar(
           'Call Failed',
           'Unable to send video call invitation to $inviteeName. Please try again.',
@@ -634,6 +937,12 @@ class ZegoCallService {
       return sent;
     } catch (e) {
       debugPrint('sendVideoCallInvitation error: $e');
+      await _callHistoryService.updateCallStatus(
+        callId: callID,
+        status: 'failed',
+        endedAt: DateTime.now(),
+        durationSeconds: 0,
+      );
       Get.snackbar(
         'Call Error',
         'An unexpected error occurred while placing the video call.',

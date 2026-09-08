@@ -19,6 +19,12 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update: if isOwner(userId);
       allow delete: if isOwner(userId);
+
+      // Call History Subcollection (Phase 8):
+      // Each authenticated user can only read and write their own call history.
+      match /call_history/{callId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // Calls Collection (prepared for calling functionality in future phases):

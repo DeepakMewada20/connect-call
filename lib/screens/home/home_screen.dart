@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
+import '../../widgets/call_history_tile.dart';
 import '../calls/calls_screen.dart';
 import '../contacts/contacts_screen.dart';
 import '../profile/profile_screen.dart';
@@ -85,9 +86,34 @@ class HomeScreen extends GetView<HomeController> {
             const SizedBox(height: 28),
 
             // Recent Calls Section
-            _buildSectionTitle('Recent Calls'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildSectionTitle('Recent Calls'),
+                Obx(() {
+                  if (controller.recentCalls.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return TextButton(
+                    onPressed: () => controller.changeTab(2),
+                    child: const Text(
+                      'View All',
+                      style: TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
             const SizedBox(height: 12),
-            _buildRecentCallsEmptyState(),
+            Obx(() {
+              if (controller.recentCalls.isEmpty) {
+                return _buildRecentCallsEmptyState();
+              }
+              return _buildRecentCallsList(context);
+            }),
           ],
         ),
       ),
@@ -315,6 +341,37 @@ class HomeScreen extends GetView<HomeController> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRecentCallsList(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.dividerColor),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: controller.recentCalls.length,
+          separatorBuilder: (context, index) => const Divider(
+            height: 1,
+            indent: 72,
+            endIndent: 16,
+            color: AppTheme.dividerColor,
+          ),
+          itemBuilder: (context, index) {
+            final call = controller.recentCalls[index];
+            return CallHistoryTile(
+              call: call,
+              onRedial: () => controller.redial(call),
+            );
+          },
+        ),
       ),
     );
   }

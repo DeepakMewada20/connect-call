@@ -1,27 +1,40 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/call_model.dart';
 import '../../models/user_model.dart';
 import '../../routes/app_routes.dart';
 import '../../services/auth_service.dart';
+import '../../services/call_history_service.dart';
 import '../../services/user_service.dart';
 import '../../services/zego_call_service.dart';
+import '../calls/calls_controller.dart';
 import '../contacts/contacts_controller.dart';
 
 class HomeController extends GetxController {
   final AuthService _authService;
   final UserService _userService;
+  final CallHistoryService _callHistoryService;
   final ZegoCallService? zegoCallService;
 
   HomeController({
     AuthService? authService,
     UserService? userService,
+    CallHistoryService? callHistoryService,
     this.zegoCallService,
   })  : _authService = authService ?? AuthService(),
-        _userService = userService ?? UserService();
+        _userService = userService ?? UserService(),
+        _callHistoryService = callHistoryService ?? CallHistoryService.instance;
 
   ZegoCallService get activeCallService =>
       zegoCallService ?? ZegoCallService.instance;
+
+  // Observables
+  final RxList<CallModel> recentCalls = <CallModel>[].obs;
+  StreamSubscription<List<CallModel>>? _recentCallsSubscription;
+
+  String? get currentUid => _authService.currentUserId;
 
   @override
   void onReady() {
@@ -30,7 +43,22 @@ class HomeController extends GetxController {
     if (!Get.testMode) {
       activeCallService.initZegoCallService();
       _ensureUserDocumentExists();
+      _subscribeToRecentCalls();
     }
+  }
+
+  @override
+  void onClose() {
+    _recentCallsSubscription?.cancel();
+    super.onClose();
+  }
+
+  void _subscribeToRecentCalls() {
+    _recentCallsSubscription?.cancel();
+    _recentCallsSubscription =
+        _callHistoryService.getRecentCalls(limit: 5).listen((calls) {
+      recentCalls.assignAll(calls);
+    });
   }
 
   // Ensure current logged-in user document is present in Firestore
@@ -66,6 +94,8 @@ class HomeController extends GetxController {
     selectedIndex.value = index;
     if (index == 1 && Get.isRegistered<ContactsController>()) {
       Get.find<ContactsController>().loadUsers();
+    } else if (index == 2 && Get.isRegistered<CallsController>()) {
+      Get.find<CallsController>().loadHistory();
     }
   }
 
@@ -118,6 +148,35 @@ class HomeController extends GetxController {
       margin: const EdgeInsets.all(16),
       duration: const Duration(seconds: 3),
     );
+  }
+
+  Future<void> redial(CallModel call) async {
+    final myUid = currentUid ?? '';
+    final otherUid = call.getOtherUserId(myUid);
+    final otherName = call.getOtherUserName(myUid);
+    final otherAvatar = call.getOtherUserPhoto(myUid) ?? '';
+
+    if (otherUid.isEmpty) return;
+
+    UserModel targetUser;
+    final freshUser = await _userService.getUser(otherUid);
+    if (freshUser != null) {
+      targetUser = freshUser;
+    } else {
+      targetUser = UserModel(
+        uid: otherUid,
+        name: otherName,
+        email: '',
+        profileImage: otherAvatar,
+        createdAt: DateTime.now(),
+      );
+    }
+
+    if (call.isVideo) {
+      await activeCallService.sendVideoCallInvitation(targetUser: targetUser);
+    } else {
+      await activeCallService.sendAudioCallInvitation(targetUser: targetUser);
+    }
   }
 
   Future<void> logout() async {
