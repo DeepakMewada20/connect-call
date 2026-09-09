@@ -132,4 +132,20 @@ class CallsController extends GetxController {
       callHistory.removeWhere((c) => c.id == callId);
     }
   }
+
+  /// Clear all call history records for the current user from local storage
+  Future<void> clearAllHistory() async {
+    final success = await _callHistoryService.clearAllHistory();
+    if (success) {
+      callHistory.clear();
+      if (!Get.testMode && Get.context != null) {
+        Get.snackbar(
+          'Call History Cleared',
+          'All call records have been deleted.',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 2),
+        );
+      }
+    }
+  }
 }

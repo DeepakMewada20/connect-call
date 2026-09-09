@@ -19,6 +19,14 @@ class CallsScreen extends StatelessWidget {
         title: const Text('Call History'),
         automaticallyImplyLeading: false,
         actions: [
+          Obx(() {
+            if (controller.callHistory.isEmpty) return const SizedBox.shrink();
+            return IconButton(
+              icon: const Icon(Icons.delete_sweep_rounded),
+              tooltip: 'Clear All History',
+              onPressed: () => _showClearConfirmation(context, controller),
+            );
+          }),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',
@@ -201,6 +209,38 @@ class CallsScreen extends StatelessWidget {
             ),
           );
         }),
+      ),
+    );
+  }
+
+  void _showClearConfirmation(BuildContext context, CallsController controller) {
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Clear Call History'),
+        content: const Text(
+          'Are you sure you want to clear all call history from this device?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              controller.clearAllHistory();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Clear All'),
+          ),
+        ],
       ),
     );
   }

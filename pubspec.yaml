@@ -43,6 +43,8 @@ dependencies:
   cloud_functions: ^6.4.0
   permission_handler: ^12.0.3
   flutter_contacts: ^2.3.1
+  sqflite: ^2.4.3
+  path: ^1.9.1
   zego_uikit_prebuilt_call: ^4.24.4
   zego_uikit_signaling_plugin: ^2.8.21
   zego_uikit: ^2.29.2
@@ -51,6 +53,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  sqflite_common_ffi: ^2.4.2+1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

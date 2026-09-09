@@ -1,67 +1,52 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import '../data/repositories/call_history_repository.dart';
 import '../models/call_model.dart';
 import 'auth_service.dart';
 
-/// CallHistoryService manages call history persistence and retrieval via Cloud Firestore.
-///
-/// Each user's call history is strictly scoped under:
-/// `users/{userId}/call_history/{callId}`
+/// CallHistoryService manages call history persistence and retrieval via local SQLite.
 ///
 /// Features:
-/// - Deterministic call IDs ensure zero duplicates across callbacks.
-/// - Fully asynchronous, non-blocking operations so Firestore operations never interrupt active calls.
+/// - Stores call records locally on the user's device using SQLite.
+/// - Scoped to the current authenticated Firebase user UID to support multi-user devices.
+/// - Fully asynchronous, non-blocking operations so local storage never interrupts active calls.
+/// - Real-time reactive stream to update UI automatically upon call inserts or updates.
 /// - Dependency injection friendly for unit testing.
 class CallHistoryService {
-  final FirebaseFirestore? _injectedFirestore;
-  final AuthService? _injectedAuthService;
-  FirebaseFirestore? _firestoreInstance;
-  AuthService? _authServiceInstance;
+  final CallHistoryRepository _repository;
+  final AuthService _authService;
 
   CallHistoryService({
-    FirebaseFirestore? firestore,
+    CallHistoryRepository? repository,
     AuthService? authService,
-  })  : _injectedFirestore = firestore,
-        _injectedAuthService = authService;
+    dynamic firestore, // Kept for constructor backward compatibility; ignored
+  })  : _authService = authService ?? AuthService(),
+        _repository = repository ??
+            CallHistoryRepositoryImpl(
+              authService: authService,
+            );
 
-  static final CallHistoryService instance = CallHistoryService();
+  static CallHistoryService? _instance;
+  static CallHistoryService get instance => _instance ??= CallHistoryService();
 
-  FirebaseFirestore get _firestore {
-    _firestoreInstance ??= _injectedFirestore ?? FirebaseFirestore.instance;
-    return _firestoreInstance!;
-  }
-
-  AuthService get _authService {
-    _authServiceInstance ??= _injectedAuthService ?? AuthService();
-    return _authServiceInstance!;
+  static void setInstance(CallHistoryService? instance) {
+    _instance = instance;
   }
 
   String? get _currentUserId => _authService.currentUserId;
 
-  // Collection reference for a given user's call history
-  CollectionReference<Map<String, dynamic>> _userHistoryCollection(String userId) {
-    return _firestore.collection('users').doc(userId).collection('call_history');
-  }
-
-  /// Create or update a call history record using deterministic [call.id]
+  /// Create or update a call history record in local SQLite
   Future<bool> saveCallRecord(CallModel call, {String? userId}) async {
-    final uid = userId ?? _currentUserId;
+    final uid = userId ?? _currentUserId ?? call.firebaseUid;
     if (uid == null || uid.isEmpty) {
       debugPrint('CallHistoryService.saveCallRecord: No authenticated user ID');
       return false;
     }
 
-    try {
-      await _userHistoryCollection(uid).doc(call.id).set(
-            call.toMap(),
-            SetOptions(merge: true),
-          );
-      debugPrint('Call history record saved [ID: ${call.id}] for user $uid');
-      return true;
-    } catch (e) {
-      debugPrint('CallHistoryService.saveCallRecord error: $e');
-      return false;
-    }
+    final recordToSave = call.firebaseUid != null && call.firebaseUid!.isNotEmpty
+        ? call
+        : call.copyWith(firebaseUid: uid);
+
+    return await _repository.saveCallRecord(recordToSave, userId: uid);
   }
 
   /// Update call status and connected duration upon call answer or completion
@@ -73,55 +58,23 @@ class CallHistoryService {
     String? userId,
   }) async {
     final uid = userId ?? _currentUserId;
-    if (uid == null || uid.isEmpty) {
-      debugPrint('CallHistoryService.updateCallStatus: No authenticated user ID');
-      return false;
-    }
-
-    try {
-      final updateData = <String, dynamic>{
-        'status': status,
-      };
-
-      if (endedAt != null) {
-        updateData['endedAt'] = Timestamp.fromDate(endedAt);
-      }
-      if (durationSeconds != null) {
-        updateData['durationSeconds'] = durationSeconds;
-      }
-
-      await _userHistoryCollection(uid).doc(callId).set(
-            updateData,
-            SetOptions(merge: true),
-          );
-      debugPrint('Call history updated [ID: $callId, Status: $status, Duration: ${durationSeconds ?? 0}s] for $uid');
-      return true;
-    } catch (e) {
-      debugPrint('CallHistoryService.updateCallStatus error: $e');
-      return false;
-    }
+    return await _repository.updateCallStatus(
+      callId: callId,
+      status: status,
+      endedAt: endedAt,
+      durationSeconds: durationSeconds,
+      userId: uid,
+    );
   }
 
-  /// Retrieve call history records ordered by startedAt descending
+  /// Retrieve call history records ordered by createdAt descending
   Future<List<CallModel>> getCallHistory({String? userId, int limit = 50}) async {
     final uid = userId ?? _currentUserId;
     if (uid == null || uid.isEmpty) {
       return [];
     }
 
-    try {
-      final snapshot = await _userHistoryCollection(uid)
-          .orderBy('startedAt', descending: true)
-          .limit(limit)
-          .get();
-
-      return snapshot.docs
-          .map((doc) => CallModel.fromMap(doc.data(), documentId: doc.id))
-          .toList();
-    } catch (e) {
-      debugPrint('CallHistoryService.getCallHistory error: $e');
-      return [];
-    }
+    return await _repository.getCallHistory(userId: uid, limit: limit);
   }
 
   /// Real-time stream of call history records for reactive UI updates
@@ -131,20 +84,7 @@ class CallHistoryService {
       return const Stream.empty();
     }
 
-    try {
-      return _userHistoryCollection(uid)
-          .orderBy('startedAt', descending: true)
-          .limit(limit)
-          .snapshots()
-          .map((snapshot) {
-        return snapshot.docs
-            .map((doc) => CallModel.fromMap(doc.data(), documentId: doc.id))
-            .toList();
-      });
-    } catch (e) {
-      debugPrint('CallHistoryService.getCallHistoryStream error: $e');
-      return const Stream.empty();
-    }
+    return _repository.getCallHistoryStream(userId: uid, limit: limit);
   }
 
   /// Retrieve recent calls for Home dashboard (default latest 5)
@@ -152,20 +92,23 @@ class CallHistoryService {
     return getCallHistoryStream(userId: userId, limit: limit);
   }
 
-  /// Delete a single call record
+  /// Delete a single call record from local SQLite
   Future<bool> deleteCallRecord(String callId, {String? userId}) async {
     final uid = userId ?? _currentUserId;
     if (uid == null || uid.isEmpty) {
       return false;
     }
 
-    try {
-      await _userHistoryCollection(uid).doc(callId).delete();
-      debugPrint('Call history record deleted [ID: $callId] for user $uid');
-      return true;
-    } catch (e) {
-      debugPrint('CallHistoryService.deleteCallRecord error: $e');
+    return await _repository.deleteCallRecord(callId, userId: uid);
+  }
+
+  /// Clear all call history records for the current user from local SQLite
+  Future<bool> clearAllHistory({String? userId}) async {
+    final uid = userId ?? _currentUserId;
+    if (uid == null || uid.isEmpty) {
       return false;
     }
+
+    return await _repository.clearAllHistory(userId: uid);
   }
 }

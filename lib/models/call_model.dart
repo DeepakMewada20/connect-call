@@ -2,42 +2,139 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// CallModel represents a single call history record in ConnectCall.
 ///
-/// Persistent location: `users/{userId}/call_history/{callId}`
+/// Persistent location: SQLite local database table `call_history`.
 class CallModel {
   final String id;
+  final String? firebaseUid;
   final String callerId;
   final String callerName;
   final String? callerPhoto;
   final String calleeId;
   final String calleeName;
   final String? calleePhoto;
+  final String? phoneNumber;
+  final String? zegoUserId;
   final String callType; // 'audio' | 'video'
   final String direction; // 'incoming' | 'outgoing'
   final String status; // 'calling' | 'connected' | 'ended' | 'rejected' | 'missed' | 'failed' | 'busy' | 'disconnected'
   final DateTime startedAt;
   final DateTime? endedAt;
   final int durationSeconds;
+  final DateTime createdAt;
 
-  const CallModel({
+  CallModel({
     required this.id,
+    this.firebaseUid,
     required this.callerId,
     required this.callerName,
     this.callerPhoto,
     required this.calleeId,
     required this.calleeName,
     this.calleePhoto,
+    this.phoneNumber,
+    this.zegoUserId,
     required this.callType,
     required this.direction,
     required this.status,
     required this.startedAt,
     this.endedAt,
     this.durationSeconds = 0,
-  });
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? startedAt;
 
-  // Convert to Map for Firestore persistence
+  /// Effective owner UID for multi-user device scoping
+  String get effectiveFirebaseUid {
+    if (firebaseUid != null && firebaseUid!.isNotEmpty) {
+      return firebaseUid!;
+    }
+    return direction == 'outgoing' ? callerId : calleeId;
+  }
+
+  /// Remote user's ID
+  String get remoteUserId => direction == 'outgoing' ? calleeId : callerId;
+
+  /// Remote user's display / contact name
+  String get contactName => direction == 'outgoing' ? calleeName : callerName;
+
+  /// Convert to Map for SQLite persistence
+  Map<String, dynamic> toSqliteMap() {
+    return {
+      'id': id,
+      'firebaseUid': effectiveFirebaseUid,
+      'remoteUserId': remoteUserId,
+      'contactName': contactName,
+      'phoneNumber': phoneNumber ?? '',
+      'zegoUserId': zegoUserId ?? '',
+      'callerId': callerId,
+      'callerName': callerName,
+      'callerPhoto': callerPhoto ?? '',
+      'calleeId': calleeId,
+      'calleeName': calleeName,
+      'calleePhoto': calleePhoto ?? '',
+      'callType': callType,
+      'direction': direction,
+      'status': status,
+      'startedAt': startedAt.millisecondsSinceEpoch,
+      'endedAt': endedAt?.millisecondsSinceEpoch,
+      'durationSeconds': durationSeconds,
+      'createdAt': createdAt.millisecondsSinceEpoch,
+    };
+  }
+
+  /// Factory constructor to restore CallModel from SQLite Map
+  factory CallModel.fromSqliteMap(Map<String, dynamic> map) {
+    DateTime parseEpoch(dynamic val) {
+      if (val is int) return DateTime.fromMillisecondsSinceEpoch(val);
+      if (val is String) {
+        final parsed = int.tryParse(val);
+        if (parsed != null) return DateTime.fromMillisecondsSinceEpoch(parsed);
+        return DateTime.tryParse(val) ?? DateTime.now();
+      }
+      return DateTime.now();
+    }
+
+    final rawEndedAt = map['endedAt'];
+
+    return CallModel(
+      id: map['id'] as String? ?? '',
+      firebaseUid: map['firebaseUid'] as String?,
+      callerId: map['callerId'] as String? ?? '',
+      callerName: map['callerName'] as String? ?? '',
+      callerPhoto: (map['callerPhoto'] as String?)?.isNotEmpty == true
+          ? map['callerPhoto'] as String
+          : null,
+      calleeId: map['calleeId'] as String? ?? '',
+      calleeName: map['calleeName'] as String? ?? '',
+      calleePhoto: (map['calleePhoto'] as String?)?.isNotEmpty == true
+          ? map['calleePhoto'] as String
+          : null,
+      phoneNumber: (map['phoneNumber'] as String?)?.isNotEmpty == true
+          ? map['phoneNumber'] as String
+          : null,
+      zegoUserId: (map['zegoUserId'] as String?)?.isNotEmpty == true
+          ? map['zegoUserId'] as String
+          : null,
+      callType: map['callType'] as String? ?? 'audio',
+      direction: map['direction'] as String? ?? 'outgoing',
+      status: map['status'] as String? ?? 'ended',
+      startedAt: parseEpoch(map['startedAt']),
+      endedAt: rawEndedAt != null ? parseEpoch(rawEndedAt) : null,
+      durationSeconds: (map['durationSeconds'] as num?)?.toInt() ?? 0,
+      createdAt: map['createdAt'] != null
+          ? parseEpoch(map['createdAt'])
+          : parseEpoch(map['startedAt']),
+    );
+  }
+
+  // Convert to Map for Firestore backwards-compatibility
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'firebaseUid': effectiveFirebaseUid,
+      'remoteUserId': remoteUserId,
+      'contactName': contactName,
+      'phoneNumber': phoneNumber ?? '',
+      'zegoUserId': zegoUserId ?? '',
       'callerId': callerId,
       'callerName': callerName,
       'callerPhoto': callerPhoto ?? '',
@@ -50,18 +147,21 @@ class CallModel {
       'startedAt': Timestamp.fromDate(startedAt),
       'endedAt': endedAt != null ? Timestamp.fromDate(endedAt!) : null,
       'durationSeconds': durationSeconds,
+      'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 
-  // Create from Firestore document snapshot map
+  // Create from Map (handles Timestamp, int epoch millis, or ISO8601 strings)
   factory CallModel.fromMap(Map<String, dynamic> map, {String? documentId}) {
     DateTime parseDate(dynamic value) {
       if (value is Timestamp) {
         return value.toDate();
-      } else if (value is String) {
-        return DateTime.tryParse(value) ?? DateTime.now();
       } else if (value is int) {
         return DateTime.fromMillisecondsSinceEpoch(value);
+      } else if (value is String) {
+        final parsed = int.tryParse(value);
+        if (parsed != null) return DateTime.fromMillisecondsSinceEpoch(parsed);
+        return DateTime.tryParse(value) ?? DateTime.now();
       }
       return DateTime.now();
     }
@@ -72,50 +172,62 @@ class CallModel {
 
     return CallModel(
       id: documentId ?? (map['id'] as String? ?? ''),
+      firebaseUid: map['firebaseUid'] as String?,
       callerId: map['callerId'] as String? ?? '',
       callerName: map['callerName'] as String? ?? '',
       callerPhoto: map['callerPhoto'] as String?,
       calleeId: map['calleeId'] as String? ?? '',
       calleeName: map['calleeName'] as String? ?? '',
       calleePhoto: map['calleePhoto'] as String?,
+      phoneNumber: map['phoneNumber'] as String?,
+      zegoUserId: map['zegoUserId'] as String?,
       callType: map['callType'] as String? ?? 'audio',
       direction: map['direction'] as String? ?? 'outgoing',
       status: map['status'] as String? ?? 'ended',
       startedAt: parseDate(map['startedAt']),
       endedAt: parsedEndedAt,
       durationSeconds: (map['durationSeconds'] as num?)?.toInt() ?? 0,
+      createdAt: map['createdAt'] != null ? parseDate(map['createdAt']) : parseDate(map['startedAt']),
     );
   }
 
   CallModel copyWith({
     String? id,
+    String? firebaseUid,
     String? callerId,
     String? callerName,
     String? callerPhoto,
     String? calleeId,
     String? calleeName,
     String? calleePhoto,
+    String? phoneNumber,
+    String? zegoUserId,
     String? callType,
     String? direction,
     String? status,
     DateTime? startedAt,
     DateTime? endedAt,
     int? durationSeconds,
+    DateTime? createdAt,
   }) {
     return CallModel(
       id: id ?? this.id,
+      firebaseUid: firebaseUid ?? this.firebaseUid,
       callerId: callerId ?? this.callerId,
       callerName: callerName ?? this.callerName,
       callerPhoto: callerPhoto ?? this.callerPhoto,
       calleeId: calleeId ?? this.calleeId,
       calleeName: calleeName ?? this.calleeName,
       calleePhoto: calleePhoto ?? this.calleePhoto,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      zegoUserId: zegoUserId ?? this.zegoUserId,
       callType: callType ?? this.callType,
       direction: direction ?? this.direction,
       status: status ?? this.status,
       startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
       durationSeconds: durationSeconds ?? this.durationSeconds,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 

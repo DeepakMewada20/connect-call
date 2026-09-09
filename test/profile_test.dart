@@ -221,8 +221,9 @@ void main() {
 
       // Verify Account and Settings sections
       expect(find.text('Account'), findsOneWidget);
-      expect(find.text('User ID'), findsOneWidget);
-      expect(find.text('user_123'), findsOneWidget);
+      expect(find.text('Account Status'), findsOneWidget);
+      expect(find.text('Verified & Active'), findsOneWidget);
+      expect(find.text('User ID'), findsNothing);
       expect(find.text('Settings'), findsOneWidget);
       expect(find.text('Logout'), findsOneWidget);
 

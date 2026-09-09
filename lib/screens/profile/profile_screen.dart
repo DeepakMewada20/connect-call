@@ -235,11 +235,8 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Account Information Section (Name, Phone Number, UID)
+  // Account Information Section
   Widget _buildAccountSection(dynamic currentUser) {
-    final String uid =
-        currentUser?.uid.isNotEmpty == true ? currentUser!.uid : 'Unknown';
-
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(18),
@@ -263,12 +260,6 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
-            _buildInfoTile(
-              icon: Icons.fingerprint_rounded,
-              title: 'User ID',
-              subtitle: uid,
-            ),
-            const Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
             _buildInfoTile(
               icon: Icons.shield_outlined,
               title: 'Account Status',
