@@ -51,8 +51,8 @@ class ProfileController extends GetxController {
           uid: 'user_local',
           name: authUser?.displayName?.isNotEmpty == true
               ? authUser!.displayName!
-              : (authUser?.email?.split('@').first ?? 'User'),
-          email: authUser?.email ?? 'user@example.com',
+              : (authUser?.phoneNumber ?? 'User'),
+          phoneNumber: authUser?.phoneNumber ?? '',
           profileImage: authUser?.photoURL ?? '',
           isOnline: false,
           createdAt: DateTime.now(),
@@ -71,8 +71,8 @@ class ProfileController extends GetxController {
           uid: currentUid,
           name: authUser?.displayName?.isNotEmpty == true
               ? authUser!.displayName!
-              : (authUser?.email?.split('@').first ?? 'User'),
-          email: authUser?.email ?? '',
+              : (authUser?.phoneNumber ?? 'User'),
+          phoneNumber: authUser?.phoneNumber ?? '',
           profileImage: authUser?.photoURL ?? '',
           isOnline: true,
           createdAt: DateTime.now(),

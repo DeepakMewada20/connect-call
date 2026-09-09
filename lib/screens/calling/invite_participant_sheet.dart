@@ -125,8 +125,8 @@ class _InviteParticipantSheetState extends State<InviteParticipantSheet> {
           ? List<UserModel>.from(others)
           : others.where((u) {
               final name = u.name.toLowerCase();
-              final email = u.email.toLowerCase();
-              return name.contains(query) || email.contains(query);
+              final phone = u.phoneNumber.toLowerCase();
+              return name.contains(query) || phone.contains(query);
             }).toList();
 
       if (mounted) {
@@ -154,8 +154,8 @@ class _InviteParticipantSheetState extends State<InviteParticipantSheet> {
         } else {
           _filteredContacts = _allContacts.where((u) {
             final name = u.name.toLowerCase();
-            final email = u.email.toLowerCase();
-            return name.contains(query) || email.contains(query);
+            final phone = u.phoneNumber.toLowerCase();
+            return name.contains(query) || phone.contains(query);
           }).toList();
         }
       });
@@ -345,7 +345,9 @@ class _InviteParticipantSheetState extends State<InviteParticipantSheet> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        user.email,
+                                        user.phoneNumber.isNotEmpty
+                                            ? user.phoneNumber
+                                            : 'No phone',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(

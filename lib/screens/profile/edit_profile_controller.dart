@@ -47,7 +47,7 @@ class EditProfileController extends GetxController {
       currentUser = UserModel(
         uid: _authService.currentUserId ?? '',
         name: authUser?.displayName ?? 'User',
-        email: authUser?.email ?? '',
+        phoneNumber: authUser?.phoneNumber ?? '',
         profileImage: authUser?.photoURL ?? '',
         createdAt: DateTime.now(),
       );

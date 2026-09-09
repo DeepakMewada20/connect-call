@@ -4,9 +4,9 @@ import 'package:get/get.dart';
 import 'package:connect_call/core/constants/app_constants.dart';
 import 'package:connect_call/routes/app_pages.dart';
 import 'package:connect_call/routes/app_routes.dart';
-import 'package:connect_call/screens/auth/forgot_password/forgot_password_screen.dart';
 import 'package:connect_call/screens/auth/login/login_screen.dart';
-import 'package:connect_call/screens/auth/register/register_screen.dart';
+import 'package:connect_call/screens/auth/name/name_screen.dart';
+import 'package:connect_call/screens/auth/otp/otp_screen.dart';
 import 'package:connect_call/screens/home/home_screen.dart';
 import 'package:connect_call/screens/splash/splash_controller.dart';
 
@@ -42,10 +42,11 @@ void main() {
 
     // Verify unauthenticated user is navigated to LoginScreen
     expect(find.byType(LoginScreen), findsOneWidget);
-    expect(find.text('Welcome back! Sign in to connect.'), findsOneWidget);
+    expect(find.text('Enter your phone number to sign in or create an account.'),
+        findsOneWidget);
   });
 
-  testWidgets('Login screen renders fields, buttons, and navigation to Register',
+  testWidgets('Phone Login screen renders fields, country code, and Send OTP button',
       (WidgetTester tester) async {
     await tester.pumpWidget(
       GetMaterialApp(
@@ -54,91 +55,68 @@ void main() {
       ),
     );
 
-    expect(find.text('Email Address'), findsOneWidget);
-    expect(find.text('Password'), findsOneWidget);
-    expect(find.text('Forgot Password?'), findsOneWidget);
-    expect(find.widgetWithText(ElevatedButton, 'Login'), findsOneWidget);
-    expect(find.text('Continue with Google'), findsOneWidget);
-    expect(find.text('Create Account'), findsOneWidget);
+    expect(find.text('Phone Number'), findsOneWidget);
+    expect(find.text('+91'), findsOneWidget);
+    expect(find.text('🇮🇳'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Send OTP'), findsOneWidget);
+  });
 
-    // Ensure Create Account button is scrolled into view and tap
-    await tester.ensureVisible(find.text('Create Account'));
-    await tester.tap(find.text('Create Account'));
+  testWidgets('Phone Login validation triggers on empty or invalid phone number',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.login,
+        getPages: AppPages.pages,
+      ),
+    );
+
+    // Tap Send OTP with empty field
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Send OTP'));
     await tester.pumpAndSettle();
 
-    // Verify RegisterScreen is pushed
-    expect(find.byType(RegisterScreen), findsOneWidget);
+    expect(find.text('Phone number is required'), findsOneWidget);
+
+    // Enter short phone number
+    await tester.enterText(find.byType(TextFormField), '98765');
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Send OTP'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Please enter a valid 10-digit mobile number'), findsOneWidget);
+  });
+
+  testWidgets('OTP screen renders verification input and Verify button',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.otp,
+        getPages: AppPages.pages,
+      ),
+    );
+
+    expect(find.byType(OtpScreen), findsOneWidget);
+    expect(find.text('Verify Phone Number'), findsOneWidget);
+    expect(find.widgetWithText(ElevatedButton, 'Verify & Continue'), findsOneWidget);
+  });
+
+  testWidgets('Name screen renders input and validates empty name',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.name,
+        getPages: AppPages.pages,
+      ),
+    );
+
+    expect(find.byType(NameScreen), findsOneWidget);
+    expect(find.text("What's your name?"), findsOneWidget);
     expect(find.text('Full Name'), findsOneWidget);
-    expect(find.text('Confirm Password'), findsOneWidget);
-    expect(find.widgetWithText(ElevatedButton, 'Create Account'), findsOneWidget);
-  });
+    expect(find.widgetWithText(ElevatedButton, 'Continue'), findsOneWidget);
 
-  testWidgets('Login validation triggers on empty fields',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(
-      GetMaterialApp(
-        initialRoute: AppRoutes.login,
-        getPages: AppPages.pages,
-      ),
-    );
-
-    // Tap Login with empty fields
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Login'));
-    await tester.pumpAndSettle();
-
-    // Verify validation errors appear
-    expect(find.text('Email is required'), findsOneWidget);
-    expect(find.text('Password is required'), findsOneWidget);
-  });
-
-  testWidgets('Register validation triggers on empty/mismatched fields',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(
-      GetMaterialApp(
-        initialRoute: AppRoutes.register,
-        getPages: AppPages.pages,
-      ),
-    );
-
-    // Tap Create Account with empty fields
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Create Account'));
+    // Tap Continue with empty name
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Continue'));
     await tester.pumpAndSettle();
 
     expect(find.text('Please enter your name'), findsOneWidget);
-    expect(find.text('Email is required'), findsOneWidget);
-    expect(find.text('Password is required'), findsOneWidget);
-  });
-
-  testWidgets('Forgot password flow navigates from Login and validates email',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(
-      GetMaterialApp(
-        initialRoute: AppRoutes.login,
-        getPages: AppPages.pages,
-      ),
-    );
-
-    // Tap Forgot Password
-    await tester.tap(find.text('Forgot Password?'));
-    await tester.pumpAndSettle();
-
-    // Verify ForgotPasswordScreen is displayed
-    expect(find.byType(ForgotPasswordScreen), findsOneWidget);
-    expect(find.text('Forgot Password?'), findsOneWidget);
-    expect(find.widgetWithText(ElevatedButton, 'Send Reset Link'), findsOneWidget);
-
-    // Submit with empty email to verify validation
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Send Reset Link'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Email is required'), findsOneWidget);
-
-    // Tap Back to Login
-    await tester.tap(find.text('Back to Login'));
-    await tester.pumpAndSettle();
-
-    // Verify returned to LoginScreen
-    expect(find.byType(LoginScreen), findsOneWidget);
   });
 
   testWidgets('Splash screen navigates to Home when user is authenticated',

@@ -40,14 +40,14 @@ class MockProfileUserService extends UserService {
 class MockProfileAuthService extends AuthService {
   final String? mockUid;
   final String? mockName;
-  final String? mockEmail;
+  final String? mockPhoneNumber;
   bool logoutCalled = false;
   String? updatedDisplayName;
 
   MockProfileAuthService({
     this.mockUid = 'user_123',
     this.mockName = 'Deepak Mewada',
-    this.mockEmail = 'deepak@example.com',
+    this.mockPhoneNumber = '+919876543210',
   });
 
   @override
@@ -79,7 +79,7 @@ void main() {
       final sampleUser = UserModel(
         uid: 'user_123',
         name: 'Deepak Mewada',
-        email: 'deepak@example.com',
+        phoneNumber: '+919876543210',
         profileImage: '',
         isOnline: true,
         createdAt: DateTime.now(),
@@ -98,7 +98,7 @@ void main() {
 
       expect(controller.user.value, isNotNull);
       expect(controller.user.value?.name, 'Deepak Mewada');
-      expect(controller.user.value?.email, 'deepak@example.com');
+      expect(controller.user.value?.phoneNumber, '+919876543210');
       expect(controller.user.value?.isOnline, isTrue);
       expect(controller.errorMessage.value, isEmpty);
       expect(controller.isLoading.value, isFalse);
@@ -141,7 +141,7 @@ void main() {
     final sampleUser = UserModel(
       uid: 'user_123',
       name: 'Deepak Mewada',
-      email: 'deepak@example.com',
+      phoneNumber: '+919876543210',
       profileImage: '',
       isOnline: true,
       createdAt: DateTime.now(),
@@ -156,7 +156,7 @@ void main() {
       controller.onInit();
 
       expect(controller.nameController.text, 'Deepak Mewada');
-      expect(controller.currentUser.email, 'deepak@example.com');
+      expect(controller.currentUser.phoneNumber, '+919876543210');
     });
 
     test('Rejects empty or whitespace-only name', () {
@@ -191,7 +191,7 @@ void main() {
       final sampleUser = UserModel(
         uid: 'user_123',
         name: 'Deepak Mewada',
-        email: 'deepak@example.com',
+        phoneNumber: '+919876543210',
         profileImage: '',
         isOnline: true,
         createdAt: DateTime.now(),
@@ -215,7 +215,7 @@ void main() {
       // Verify Header
       expect(find.text('Profile'), findsOneWidget);
       expect(find.text('Deepak Mewada'), findsWidgets);
-      expect(find.text('deepak@example.com'), findsOneWidget);
+      expect(find.text('+919876543210'), findsOneWidget);
       expect(find.text('Online'), findsOneWidget);
       expect(find.text('Edit Profile'), findsOneWidget);
 
@@ -249,7 +249,7 @@ void main() {
       final sampleUser = UserModel(
         uid: 'user_123',
         name: 'Deepak Mewada',
-        email: 'deepak@example.com',
+        phoneNumber: '+919876543210',
         profileImage: '',
         isOnline: true,
         createdAt: DateTime.now(),
@@ -286,8 +286,8 @@ void main() {
 
       expect(find.text('Edit Profile'), findsOneWidget);
       expect(find.text('Full Name'), findsOneWidget);
-      expect(find.text('Email Address'), findsOneWidget);
-      expect(find.text('Email cannot be changed directly.'), findsOneWidget);
+      expect(find.text('Phone Number'), findsOneWidget);
+      expect(find.text('Phone number cannot be changed directly.'), findsOneWidget);
       expect(find.text('Save Changes'), findsOneWidget);
 
       // Clear name and tap Save Changes

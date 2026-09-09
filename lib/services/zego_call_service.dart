@@ -143,7 +143,7 @@ class ZegoCallService {
         displayName = currentUser.displayName?.trim() ?? '';
       }
       if (displayName.isEmpty) {
-        displayName = currentUser.email?.split('@').first ?? 'User';
+        displayName = currentUser.phoneNumber?.trim() ?? 'User';
       }
 
       // Proactively request microphone and camera permissions so both caller and receiver

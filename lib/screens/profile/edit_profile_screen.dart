@@ -42,8 +42,8 @@ class EditProfileScreen extends GetView<EditProfileController> {
 
               const SizedBox(height: 20),
 
-              // Read-only Email Field
-              _buildEmailField(),
+              // Read-only Phone Field
+              _buildPhoneField(),
 
               const SizedBox(height: 36),
 
@@ -203,12 +203,12 @@ class EditProfileScreen extends GetView<EditProfileController> {
     );
   }
 
-  Widget _buildEmailField() {
+  Widget _buildPhoneField() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Email Address',
+          'Phone Number',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -218,16 +218,16 @@ class EditProfileScreen extends GetView<EditProfileController> {
         const SizedBox(height: 8),
         TextField(
           controller:
-              TextEditingController(text: controller.currentUser.email),
+              TextEditingController(text: controller.currentUser.phoneNumber),
           enabled: false,
           style: TextStyle(color: Colors.grey.shade600),
           decoration: InputDecoration(
             prefixIcon: const Icon(
-              Icons.email_outlined,
+              Icons.phone_outlined,
               color: AppTheme.textSecondary,
               size: 22,
             ),
-            helperText: 'Email cannot be changed directly.',
+            helperText: 'Phone number cannot be changed directly.',
             helperStyle: TextStyle(
               fontSize: 12,
               color: Colors.grey.shade500,

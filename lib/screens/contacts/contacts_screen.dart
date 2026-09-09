@@ -269,7 +269,7 @@ class ContactsScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     isSearching
-                        ? 'Try a different name or email.'
+                        ? 'Try a different name or phone number.'
                         : 'Registered users will appear here.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(

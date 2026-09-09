@@ -1,6 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../models/user_model.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/user_service.dart';
@@ -16,71 +16,123 @@ class LoginController extends GetxController {
         _userService = userService ?? UserService();
 
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  final TextEditingController phoneController = TextEditingController();
 
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
+  // Selected country code (default India +91)
+  final RxString selectedCountryCode = '+91'.obs;
 
-  // Reactive state
+  // Reactive UI state
   final RxBool isLoading = false.obs;
-  final RxBool isGoogleLoading = false.obs;
-  final RxBool isPasswordVisible = false.obs;
   final RxString errorMessage = ''.obs;
 
   @override
   void onClose() {
-    emailController.dispose();
-    passwordController.dispose();
+    phoneController.dispose();
     super.onClose();
   }
 
-  void togglePasswordVisibility() {
-    isPasswordVisible.value = !isPasswordVisible.value;
-  }
-
-  // Email validation rule
-  String? validateEmail(String? value) {
+  // Phone number validation rule
+  String? validatePhoneNumber(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Email is required';
+      return 'Phone number is required';
     }
-    final emailRegex =
-        RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-    if (!emailRegex.hasMatch(value.trim())) {
-      return 'Please enter a valid email address';
+
+    final cleanNumber = value.trim().replaceAll(RegExp(r'\s+|-'), '');
+
+    // Digits only
+    if (!RegExp(r'^\d+$').hasMatch(cleanNumber)) {
+      return 'Phone number must contain only digits';
     }
+
+    // Validation for India (+91)
+    if (selectedCountryCode.value == '+91') {
+      if (cleanNumber.length != 10) {
+        return 'Please enter a valid 10-digit mobile number';
+      }
+      if (!RegExp(r'^[6-9]').hasMatch(cleanNumber)) {
+        return 'Indian mobile numbers start with 6, 7, 8, or 9';
+      }
+    } else {
+      if (cleanNumber.length < 7 || cleanNumber.length > 15) {
+        return 'Please enter a valid phone number (7-15 digits)';
+      }
+    }
+
     return null;
   }
 
-  // Password validation rule
-  String? validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password is required';
-    }
-    return null;
-  }
-
-  Future<void> login() async {
+  // Trigger Send OTP
+  Future<void> sendOtp() async {
     errorMessage.value = '';
 
     if (!formKey.currentState!.validate()) {
       return;
     }
 
-    if (isLoading.value || isGoogleLoading.value) return;
+    if (isLoading.value) return;
+
+    final cleanNumber =
+        phoneController.text.trim().replaceAll(RegExp(r'\s+|-'), '');
+    final fullPhoneNumber = '${selectedCountryCode.value}$cleanNumber';
 
     isLoading.value = true;
 
     try {
-      await _authService.login(
-        email: emailController.text.trim(),
-        password: passwordController.text,
+      await _authService.verifyPhoneNumber(
+        phoneNumber: fullPhoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          debugPrint('LoginController: Auto-verification completed by Firebase');
+          try {
+            final userCredential =
+                await _authService.signInWithCredential(credential);
+            await handlePostAuthNavigation(userCredential.user, fullPhoneNumber);
+          } catch (e) {
+            isLoading.value = false;
+            errorMessage.value = e.toString();
+            Get.snackbar(
+              'Verification Error',
+              errorMessage.value,
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.red.shade600,
+              colorText: Colors.white,
+            );
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          debugPrint('LoginController: verificationFailed: ${e.code} - ${e.message}');
+          isLoading.value = false;
+          errorMessage.value = AuthService.mapFirebaseAuthError(e);
+          Get.snackbar(
+            'Verification Failed',
+            errorMessage.value,
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red.shade600,
+            colorText: Colors.white,
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 4),
+          );
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          debugPrint('LoginController: codeSent received verificationId');
+          isLoading.value = false;
+          Get.toNamed(
+            AppRoutes.otp,
+            arguments: {
+              'verificationId': verificationId,
+              'phoneNumber': fullPhoneNumber,
+              'resendToken': resendToken,
+            },
+          );
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          debugPrint('LoginController: codeAutoRetrievalTimeout');
+        },
       );
-
-      // Navigate to Home upon successful login
-      Get.offAllNamed(AppRoutes.home);
     } catch (e) {
+      isLoading.value = false;
       errorMessage.value = e.toString();
       Get.snackbar(
-        'Login Failed',
+        'Request Failed',
         errorMessage.value,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red.shade600,
@@ -88,66 +140,45 @@ class LoginController extends GetxController {
         margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 4),
       );
-    } finally {
-      isLoading.value = false;
     }
   }
 
-  // Google Sign-In logic with Firestore synchronization
-  Future<void> signInWithGoogle() async {
-    if (isLoading.value || isGoogleLoading.value) return;
-
-    isGoogleLoading.value = true;
-    errorMessage.value = '';
+  // Handle post-authentication navigation:
+  // Check Firestore user profile; if existing user -> Home; if new user -> Name screen
+  Future<void> handlePostAuthNavigation(User? user, String fallbackPhone) async {
+    if (user == null) {
+      isLoading.value = false;
+      return;
+    }
 
     try {
-      final credential = await _authService.signInWithGoogle();
-      if (credential == null) {
-        // User dismissed the Google account picker
-        return;
-      }
+      final existingProfile = await _userService.getUser(user.uid);
+      isLoading.value = false;
 
-      final user = credential.user;
-      if (user != null) {
-        // Check if user document already exists in Firestore
-        final existingUser = await _userService.getUser(user.uid);
-        if (existingUser == null) {
-          final newUser = UserModel(
-            uid: user.uid,
-            name: user.displayName ?? 'Google User',
-            email: user.email ?? '',
-            profileImage: user.photoURL ?? '',
-            isOnline: true,
-            createdAt: DateTime.now(),
-          );
-          await _userService.createUser(newUser);
-        } else {
-          await _userService.updateOnlineStatus(user.uid, true);
-        }
-
+      if (existingProfile != null && existingProfile.name.trim().isNotEmpty) {
+        // Existing User: Navigate directly to Home
         Get.offAllNamed(AppRoutes.home);
+      } else {
+        // New User: Navigate to Name Screen
+        Get.offAllNamed(
+          AppRoutes.name,
+          arguments: {
+            'uid': user.uid,
+            'phoneNumber': user.phoneNumber ?? fallbackPhone,
+          },
+        );
       }
     } catch (e) {
-      errorMessage.value = e.toString();
-      Get.snackbar(
-        'Google Sign-In Failed',
-        errorMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red.shade600,
-        colorText: Colors.white,
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 4),
+      isLoading.value = false;
+      debugPrint('LoginController.handlePostAuthNavigation error: $e');
+      // If Firestore query fails, fallback safely to Name screen so profile can be ensured
+      Get.offAllNamed(
+        AppRoutes.name,
+        arguments: {
+          'uid': user.uid,
+          'phoneNumber': user.phoneNumber ?? fallbackPhone,
+        },
       );
-    } finally {
-      isGoogleLoading.value = false;
     }
-  }
-
-  void goToRegister() {
-    Get.toNamed(AppRoutes.register);
-  }
-
-  void goToForgotPassword() {
-    Get.toNamed(AppRoutes.forgotPassword);
   }
 }

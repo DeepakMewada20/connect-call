@@ -22,7 +22,7 @@ void main() {
       final targetUser = UserModel(
         uid: 'user_target_456',
         name: 'Conference Friend',
-        email: 'friend@example.com',
+        phoneNumber: '+919876543210',
         createdAt: DateTime.now(),
       );
 

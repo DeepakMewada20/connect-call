@@ -13,12 +13,10 @@ service cloud.firestore {
     }
 
     // Users Collection:
-    // Authenticated users can read user profiles (for Contacts list and search).
-    // Users can only create or update their own profile document.
+    // Authenticated users can only read, create, or update their own profile document.
+    // This prevents exposing all registered users until contact matching is introduced in Phase 2.
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow read, create, update, delete: if isOwner(userId);
 
       // Call History Subcollection (Phase 8):
       // Each authenticated user can only read and write their own call history.

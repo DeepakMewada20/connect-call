@@ -46,7 +46,7 @@ class ProfileScreen extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
               child: Column(
                 children: [
-                  // Profile Header Card: Avatar, Name, Email, Status
+                  // Profile Header Card: Avatar, Name, Phone Number, Status
                   _buildProfileHeader(controller, currentUser),
 
                   const SizedBox(height: 20),
@@ -74,13 +74,12 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Profile Header with Avatar, Name, Email, and Online/Offline Badge
+  // Profile Header with Avatar, Name, Phone Number, and Online/Offline Badge
   Widget _buildProfileHeader(
       ProfileController controller, dynamic currentUser) {
     final String displayName =
         currentUser?.name.isNotEmpty == true ? currentUser!.name : 'User';
-    final String email =
-        currentUser?.email.isNotEmpty == true ? currentUser!.email : 'No email';
+    final String contactInfo = currentUser?.phoneNumber ?? '';
     final String initial =
         displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
     final bool isOnline = currentUser?.isOnline ?? false;
@@ -160,17 +159,19 @@ class ProfileScreen extends StatelessWidget {
 
           const SizedBox(height: 4),
 
-          // User Email
-          Text(
-            email,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppTheme.textSecondary,
+          // User Phone Number
+          if (contactInfo.isNotEmpty) ...[
+            Text(
+              contactInfo,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+              ),
             ),
-          ),
-
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ] else
+            const SizedBox(height: 12),
 
           // Online / Offline Status Pill
           Container(
@@ -234,7 +235,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Account Information Section (Name, Email, UID)
+  // Account Information Section (Name, Phone Number, UID)
   Widget _buildAccountSection(dynamic currentUser) {
     final String uid =
         currentUser?.uid.isNotEmpty == true ? currentUser!.uid : 'Unknown';

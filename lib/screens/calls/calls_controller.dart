@@ -113,7 +113,6 @@ class CallsController extends GetxController {
       targetUser = UserModel(
         uid: otherUid,
         name: otherName,
-        email: '',
         profileImage: otherPhoto,
         createdAt: DateTime.now(),
       );

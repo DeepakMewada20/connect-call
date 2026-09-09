@@ -73,7 +73,7 @@ void main() {
       final targetUser = UserModel(
         uid: 'user_target_123',
         name: 'Jane Doe',
-        email: 'jane@example.com',
+        phoneNumber: '+919876543210',
         createdAt: DateTime.now(),
       );
 
@@ -86,7 +86,7 @@ void main() {
       final targetUser = UserModel(
         uid: 'user_target_123',
         name: 'Jane Doe',
-        email: 'jane@example.com',
+        phoneNumber: '+919876543210',
         createdAt: DateTime.now(),
       );
 

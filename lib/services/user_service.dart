@@ -31,6 +31,34 @@ class UserService {
     }
   }
 
+  // Create or save new user profile with server timestamps (preferred for Phone Auth registration)
+  Future<void> createUserProfile({
+    required String uid,
+    required String name,
+    required String phoneNumber,
+    String? profileImage,
+  }) async {
+    try {
+      final data = <String, dynamic>{
+        'uid': uid,
+        'name': name.trim(),
+        'phoneNumber': phoneNumber.trim(),
+        'profileImage': profileImage?.trim() ?? '',
+        'isOnline': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      await _usersCollection.doc(uid).set(
+            data,
+            SetOptions(merge: true),
+          );
+      debugPrint('Firestore user profile created for UID: $uid');
+    } catch (e) {
+      debugPrint('UserService.createUserProfile error: $e');
+      throw 'Failed to save user profile to database.';
+    }
+  }
+
   // Retrieve user document by UID
   Future<UserModel?> getUser(String uid) async {
     try {

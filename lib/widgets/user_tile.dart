@@ -38,7 +38,7 @@ class UserTile extends StatelessWidget {
             _buildAvatarWithStatus(),
             const SizedBox(width: 14),
 
-            // User Name and Status / Email
+            // User Name and Status / Phone Number
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,7 +79,7 @@ class UserTile extends StatelessWidget {
                               : AppTheme.textSecondary,
                         ),
                       ),
-                      if (user.email.isNotEmpty) ...[
+                      if (user.phoneNumber.isNotEmpty) ...[
                         const SizedBox(width: 6),
                         Text(
                           '•',
@@ -91,7 +91,7 @@ class UserTile extends StatelessWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            user.email,
+                            user.phoneNumber,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

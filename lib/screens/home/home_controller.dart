@@ -71,7 +71,7 @@ class HomeController extends GetxController {
           final newUser = UserModel(
             uid: user.uid,
             name: user.displayName ?? 'User',
-            email: user.email ?? '',
+            phoneNumber: user.phoneNumber ?? '',
             profileImage: user.photoURL ?? '',
             isOnline: true,
             createdAt: DateTime.now(),
@@ -117,8 +117,8 @@ class HomeController extends GetxController {
     if (user?.displayName != null && user!.displayName!.trim().isNotEmpty) {
       return user.displayName!.trim();
     }
-    if (user?.email != null && user!.email!.isNotEmpty) {
-      return user.email!.split('@').first;
+    if (user?.phoneNumber != null && user!.phoneNumber!.isNotEmpty) {
+      return user.phoneNumber!;
     }
     return 'User';
   }
@@ -166,7 +166,6 @@ class HomeController extends GetxController {
       targetUser = UserModel(
         uid: otherUid,
         name: otherName,
-        email: '',
         profileImage: otherAvatar,
         createdAt: DateTime.now(),
       );

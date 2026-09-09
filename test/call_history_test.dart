@@ -424,7 +424,7 @@ void main() {
           'user_other': UserModel(
             uid: 'user_other',
             name: 'Charlie',
-            email: 'charlie@test.com',
+            phoneNumber: '+919876543210',
             createdAt: DateTime.now(),
           ),
         }),

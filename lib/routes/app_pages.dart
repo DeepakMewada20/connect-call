@@ -1,10 +1,10 @@
 import 'package:get/get.dart';
-import '../screens/auth/forgot_password/forgot_password_binding.dart';
-import '../screens/auth/forgot_password/forgot_password_screen.dart';
 import '../screens/auth/login/login_binding.dart';
 import '../screens/auth/login/login_screen.dart';
-import '../screens/auth/register/register_binding.dart';
-import '../screens/auth/register/register_screen.dart';
+import '../screens/auth/name/name_binding.dart';
+import '../screens/auth/name/name_screen.dart';
+import '../screens/auth/otp/otp_binding.dart';
+import '../screens/auth/otp/otp_screen.dart';
 import '../screens/home/home_binding.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/profile/edit_profile_binding.dart';
@@ -34,16 +34,16 @@ class AppPages {
       transitionDuration: const Duration(milliseconds: 300),
     ),
     GetPage(
-      name: AppRoutes.register,
-      page: () => const RegisterScreen(),
-      binding: RegisterBinding(),
+      name: AppRoutes.otp,
+      page: () => const OtpScreen(),
+      binding: OtpBinding(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
     ),
     GetPage(
-      name: AppRoutes.forgotPassword,
-      page: () => const ForgotPasswordScreen(),
-      binding: ForgotPasswordBinding(),
+      name: AppRoutes.name,
+      page: () => const NameScreen(),
+      binding: NameBinding(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
     ),

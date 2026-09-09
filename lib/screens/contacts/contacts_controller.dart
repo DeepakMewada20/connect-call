@@ -77,7 +77,7 @@ class ContactsController extends GetxController {
     searchQuery.value = '';
   }
 
-  // Case-insensitive client-side filtered users by name or email
+  // Case-insensitive client-side filtered users by name or phone number
   List<UserModel> get filteredUsers {
     final query = searchQuery.value.trim().toLowerCase();
     if (query.isEmpty) {
@@ -86,8 +86,8 @@ class ContactsController extends GetxController {
 
     return users.where((user) {
       final matchesName = user.name.toLowerCase().contains(query);
-      final matchesEmail = user.email.toLowerCase().contains(query);
-      return matchesName || matchesEmail;
+      final matchesPhone = user.phoneNumber.toLowerCase().contains(query);
+      return matchesName || matchesPhone;
     }).toList();
   }
 

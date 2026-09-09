@@ -49,7 +49,7 @@ void main() {
 
       expect(user.uid, '');
       expect(user.name, '');
-      expect(user.email, '');
+      expect(user.phoneNumber, '');
       expect(user.profileImage, '');
       expect(user.isOnline, false);
       expect(user.createdAt, isA<DateTime>());
@@ -57,13 +57,13 @@ void main() {
 
     test('fromMap correctly parses documentId if not in map', () {
       final user = UserModel.fromMap(
-        {'name': 'Alex', 'email': 'alex@example.com'},
+        {'name': 'Alex', 'phoneNumber': '+919876543210'},
         documentId: 'doc_123',
       );
 
       expect(user.uid, 'doc_123');
       expect(user.name, 'Alex');
-      expect(user.email, 'alex@example.com');
+      expect(user.phoneNumber, '+919876543210');
       expect(user.isOnline, false);
     });
 
@@ -81,14 +81,14 @@ void main() {
     final userCurrent = UserModel(
       uid: 'user_current',
       name: 'Current User',
-      email: 'current@test.com',
+      phoneNumber: '+919999900000',
       createdAt: DateTime.now(),
     );
 
     final userAlice = UserModel(
       uid: 'user_alice',
       name: 'Alice Johnson',
-      email: 'alice@test.com',
+      phoneNumber: '+919876543210',
       isOnline: true,
       createdAt: DateTime.now(),
     );
@@ -96,7 +96,7 @@ void main() {
     final userBob = UserModel(
       uid: 'user_bob',
       name: 'Bob Smith',
-      email: 'bob@example.com',
+      phoneNumber: '+919123456789',
       isOnline: false,
       createdAt: DateTime.now(),
     );
@@ -156,7 +156,7 @@ void main() {
       expect(controller.searchQuery.value, isEmpty);
     });
 
-    test('Search filters users by email case-insensitively', () async {
+    test('Search filters users by phone number case-insensitively', () async {
       final mockUserService = MockUserService(
         mockUsers: [userAlice, userBob],
       );
@@ -168,7 +168,7 @@ void main() {
       );
       await controller.loadUsers();
 
-      controller.onSearchChanged('example.com');
+      controller.onSearchChanged('12345');
       expect(controller.filteredUsers.length, 1);
       expect(controller.filteredUsers.first.name, 'Bob Smith');
     });
@@ -214,7 +214,7 @@ void main() {
       final testUser = UserModel(
         uid: 'user_test',
         name: 'Jane Doe',
-        email: 'jane@example.com',
+        phoneNumber: '+919876543210',
         isOnline: true,
         createdAt: DateTime.now(),
       );
@@ -233,7 +233,7 @@ void main() {
 
       expect(find.text('Jane Doe'), findsOneWidget);
       expect(find.text('Online'), findsOneWidget);
-      expect(find.text('jane@example.com'), findsOneWidget);
+      expect(find.text('+919876543210'), findsOneWidget);
       expect(find.byIcon(Icons.call_rounded), findsOneWidget);
       expect(find.byIcon(Icons.videocam_rounded), findsOneWidget);
 
@@ -251,7 +251,7 @@ void main() {
       final offlineUser = UserModel(
         uid: 'user_offline',
         name: 'Offline Bob',
-        email: 'bob@example.com',
+        phoneNumber: '+919111122222',
         isOnline: false,
         createdAt: DateTime.now(),
       );
@@ -278,14 +278,14 @@ void main() {
       final userAlice = UserModel(
         uid: 'u1',
         name: 'Alice Springs',
-        email: 'alice@springs.com',
+        phoneNumber: '+919888877777',
         isOnline: true,
         createdAt: DateTime.now(),
       );
       final userCharlie = UserModel(
         uid: 'u2',
         name: 'Charlie Brown',
-        email: 'charlie@peanuts.com',
+        phoneNumber: '+919666655555',
         isOnline: false,
         createdAt: DateTime.now(),
       );
@@ -337,7 +337,7 @@ void main() {
           UserModel(
             uid: 'u1',
             name: 'Alice',
-            email: 'alice@mail.com',
+            phoneNumber: '+919876543210',
             createdAt: DateTime.now(),
           ),
         ]),
@@ -358,7 +358,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('No contacts found'), findsOneWidget);
-      expect(find.text('Try a different name or email.'), findsOneWidget);
+      expect(find.text('Try a different name or phone number.'), findsOneWidget);
     });
 
     testWidgets('Displays error state with retry button on failure',
@@ -388,7 +388,7 @@ void main() {
           UserModel(
             uid: 'u1',
             name: 'Sarah Connor',
-            email: 'sarah@sky.net',
+            phoneNumber: '+919999988888',
             createdAt: DateTime.now(),
           ),
         ]),
