@@ -28,19 +28,32 @@ class ContactsScreen extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            // Main Content Area: Loading / Error / Empty / List
+            // Main Content Area
             Expanded(
               child: Obx(() {
+                // 1. Permission Permanently Denied
+                if (controller.permissionState.value ==
+                    ContactsPermissionState.permanentlyDenied) {
+                  return _buildPermanentlyDeniedState(controller);
+                }
+
+                // 2. Permission Denied
+                if (controller.permissionState.value == ContactsPermissionState.denied) {
+                  return _buildPermissionDeniedState(controller);
+                }
+
+                // 3. Loading State
                 if (controller.isLoading.value) {
                   return _buildLoadingState();
                 }
 
+                // 4. Error State (Network or Generic)
                 if (controller.errorMessage.isNotEmpty) {
                   return _buildErrorState(controller);
                 }
 
+                // 5. Empty State vs Populated List
                 final usersList = controller.filteredUsers;
-
                 if (usersList.isEmpty) {
                   return _buildEmptyState(controller);
                 }
@@ -140,6 +153,131 @@ class ContactsScreen extends StatelessWidget {
     );
   }
 
+  // Permission Denied State
+  Widget _buildPermissionDeniedState(ContactsController controller) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.contacts_outlined,
+                size: 38,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Permission Required',
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Contacts permission is required to find your friends on ConnectCall.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: controller.requestPermission,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Grant Permission',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Permission Permanently Denied State
+  Widget _buildPermanentlyDeniedState(ContactsController controller) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.settings_suggest_rounded,
+                size: 38,
+                color: Colors.orange.shade700,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Permission Needed',
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Contacts permission is permanently denied. Please enable it from Settings.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: controller.openSettings,
+              icon: const Icon(Icons.settings_rounded, size: 18),
+              label: const Text(
+                'Open Settings',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // Loading state indicator
   Widget _buildLoadingState() {
     return const Center(
@@ -152,7 +290,7 @@ class ContactsScreen extends StatelessWidget {
           ),
           SizedBox(height: 16),
           Text(
-            'Loading contacts...',
+            'Finding contacts...',
             style: TextStyle(
               fontSize: 14,
               color: AppTheme.textSecondary,
@@ -166,6 +304,7 @@ class ContactsScreen extends StatelessWidget {
 
   // Error state with retry button
   Widget _buildErrorState(ContactsController controller) {
+    final bool isNet = controller.isNetworkError.value;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -180,25 +319,27 @@ class ContactsScreen extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.error_outline_rounded,
+                isNet ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
                 size: 34,
                 color: Colors.red.shade400,
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Unable to load contacts',
-              style: TextStyle(
+            Text(
+              isNet ? 'Network Error' : 'Unable to load contacts',
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Something went wrong while fetching the contacts list.',
+            Text(
+              controller.errorMessage.value.isNotEmpty
+                  ? controller.errorMessage.value
+                  : 'Something went wrong while fetching contacts.',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
                 color: AppTheme.textSecondary,
                 height: 1.4,
@@ -206,7 +347,7 @@ class ContactsScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
-              onPressed: controller.loadUsers,
+              onPressed: controller.refreshContacts,
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
@@ -231,7 +372,7 @@ class ContactsScreen extends StatelessWidget {
     return RefreshIndicator(
       color: AppTheme.primaryColor,
       backgroundColor: Colors.white,
-      onRefresh: controller.loadUsers,
+      onRefresh: controller.refreshContacts,
       child: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
@@ -258,9 +399,9 @@ class ContactsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  const Text(
-                    'No contacts found',
-                    style: TextStyle(
+                  Text(
+                    isSearching ? 'No contacts found' : 'No registered contacts found.',
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.textPrimary,
@@ -270,7 +411,7 @@ class ContactsScreen extends StatelessWidget {
                   Text(
                     isSearching
                         ? 'Try a different name or phone number.'
-                        : 'Registered users will appear here.',
+                        : 'None of your phone contacts are registered on ConnectCall yet.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 14,
@@ -290,7 +431,7 @@ class ContactsScreen extends StatelessWidget {
                     )
                   else
                     ElevatedButton.icon(
-                      onPressed: controller.loadUsers,
+                      onPressed: controller.refreshContacts,
                       icon: const Icon(Icons.refresh_rounded, size: 18),
                       label: const Text('Refresh Contacts'),
                       style: ElevatedButton.styleFrom(
@@ -316,7 +457,7 @@ class ContactsScreen extends StatelessWidget {
     return RefreshIndicator(
       color: AppTheme.primaryColor,
       backgroundColor: Colors.white,
-      onRefresh: controller.loadUsers,
+      onRefresh: controller.refreshContacts,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(top: 4, bottom: 20),

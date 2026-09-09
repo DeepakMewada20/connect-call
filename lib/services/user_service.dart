@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import '../core/utils/phone_number_util.dart';
 import '../models/user_model.dart';
 
 class UserService {
@@ -39,10 +40,12 @@ class UserService {
     String? profileImage,
   }) async {
     try {
+      final normalized = PhoneNumberUtil.normalize(phoneNumber) ?? phoneNumber.trim();
       final data = <String, dynamic>{
         'uid': uid,
         'name': name.trim(),
         'phoneNumber': phoneNumber.trim(),
+        'normalizedPhoneNumber': normalized,
         'profileImage': profileImage?.trim() ?? '',
         'isOnline': true,
         'createdAt': FieldValue.serverTimestamp(),
@@ -56,6 +59,56 @@ class UserService {
     } catch (e) {
       debugPrint('UserService.createUserProfile error: $e');
       throw 'Failed to save user profile to database.';
+    }
+  }
+
+  /// Splits a list into chunks of at most [chunkSize].
+  static List<List<T>> chunkList<T>(List<T> list, int chunkSize) {
+    if (list.isEmpty || chunkSize <= 0) return [];
+    final List<List<T>> chunks = [];
+    for (var i = 0; i < list.length; i += chunkSize) {
+      final end = (i + chunkSize < list.length) ? i + chunkSize : list.length;
+      chunks.add(list.sublist(i, end));
+    }
+    return chunks;
+  }
+
+  /// Queries Firestore in batches of at most 30 phone numbers using `whereIn`.
+  ///
+  /// Enforces `.limit(batch.length)` for privacy compliance and runs batch queries
+  /// concurrently. Returns deduplicated registered users.
+  Future<List<UserModel>> matchUsersByPhoneNumbers(List<String> phoneNumbers) async {
+    if (phoneNumbers.isEmpty) return [];
+
+    // Deduplicate incoming numbers
+    final uniqueNumbers = phoneNumbers.toSet().toList();
+    final chunks = chunkList(uniqueNumbers, 30);
+    final Map<String, UserModel> matchedUsers = {};
+
+    try {
+      final futures = chunks.map((chunk) async {
+        // Query by phoneNumber
+        final snap = await _usersCollection
+            .where('phoneNumber', whereIn: chunk)
+            .limit(chunk.length)
+            .get();
+
+        return snap.docs
+            .map((d) => UserModel.fromMap(d.data(), documentId: d.id))
+            .toList();
+      });
+
+      final results = await Future.wait(futures);
+      for (final list in results) {
+        for (final user in list) {
+          matchedUsers[user.uid] = user;
+        }
+      }
+
+      return matchedUsers.values.toList();
+    } catch (e) {
+      debugPrint('UserService.matchUsersByPhoneNumbers error: $e');
+      throw mapFirestoreError(e);
     }
   }
 

@@ -69,5 +69,7 @@
 	<string>ConnectCall requires microphone access for 1-to-1 audio and video calls.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>ConnectCall requires camera access for 1-to-1 video calls.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>ConnectCall needs access to your contacts to find your friends who are registered on ConnectCall.</string>
 </dict>
 </plist>

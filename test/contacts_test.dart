@@ -1,26 +1,75 @@
+import 'package:connect_call/core/utils/phone_number_util.dart';
 import 'package:connect_call/models/user_model.dart';
 import 'package:connect_call/screens/contacts/contacts_controller.dart';
 import 'package:connect_call/screens/contacts/contacts_screen.dart';
 import 'package:connect_call/services/auth_service.dart';
+import 'package:connect_call/services/contact_service.dart';
 import 'package:connect_call/services/user_service.dart';
-import 'package:connect_call/widgets/user_tile.dart';
+import 'package:connect_call/services/zego_call_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+// Mock ContactService for testing device contacts and permissions
+class MockContactService extends ContactService {
+  PermissionStatus mockPermissionStatus;
+  PermissionStatus mockRequestResultStatus;
+  List<DeviceContact> mockContacts;
+  bool openSettingsCalled = false;
+
+  MockContactService({
+    this.mockPermissionStatus = PermissionStatus.granted,
+    this.mockRequestResultStatus = PermissionStatus.granted,
+    this.mockContacts = const [],
+  });
+
+  @override
+  Future<PermissionStatus> checkPermission() async => mockPermissionStatus;
+
+  @override
+  Future<PermissionStatus> requestPermission() async => mockRequestResultStatus;
+
+  @override
+  Future<bool> openAppSettings() async {
+    openSettingsCalled = true;
+    return true;
+  }
+
+  @override
+  Future<List<DeviceContact>> getContacts() async => mockContacts;
+}
 
 // Mock UserService that doesn't need Firebase initialized
 class MockUserService extends UserService {
-  final List<UserModel> mockUsers;
+  final List<UserModel> registeredUsers;
   final bool shouldThrow;
+  final bool throwNetwork;
+  List<String> lastQueriedNumbers = [];
 
-  MockUserService({this.mockUsers = const [], this.shouldThrow = false});
+  MockUserService({
+    this.registeredUsers = const [],
+    this.shouldThrow = false,
+    this.throwNetwork = false,
+  });
+
+  @override
+  Future<List<UserModel>> matchUsersByPhoneNumbers(List<String> phoneNumbers) async {
+    lastQueriedNumbers = List.from(phoneNumbers);
+    if (throwNetwork) throw 'Network error. Please check your connection.';
+    if (shouldThrow) throw 'Firestore connection error';
+
+    return registeredUsers
+        .where((u) =>
+            phoneNumbers.contains(u.phoneNumber) ||
+            phoneNumbers.contains(u.effectiveNormalizedPhone))
+        .toList();
+  }
 
   @override
   Future<List<UserModel>> getUsers() async {
-    if (shouldThrow) {
-      throw 'Firestore connection error';
-    }
-    return mockUsers;
+    if (shouldThrow) throw 'Firestore connection error';
+    return registeredUsers;
   }
 }
 
@@ -34,6 +83,30 @@ class MockAuthService extends AuthService {
   String? get currentUserId => mockUid;
 }
 
+// Mock ZegoCallService for tracking call invitations
+class MockZegoCallService extends ZegoCallService {
+  UserModel? lastAudioTarget;
+  UserModel? lastVideoTarget;
+
+  @override
+  Future<bool> sendAudioCallInvitation({
+    required UserModel targetUser,
+    BuildContext? context,
+  }) async {
+    lastAudioTarget = targetUser;
+    return true;
+  }
+
+  @override
+  Future<bool> sendVideoCallInvitation({
+    required UserModel targetUser,
+    BuildContext? context,
+  }) async {
+    lastVideoTarget = targetUser;
+    return true;
+  }
+}
+
 void main() {
   setUp(() {
     Get.testMode = true;
@@ -43,7 +116,32 @@ void main() {
     Get.reset();
   });
 
-  group('UserModel Null-Safety Tests', () {
+  // Test data models
+  final userRahul = UserModel(
+    uid: 'u_rahul',
+    name: 'Rahul Sharma',
+    phoneNumber: '+919876543210',
+    isOnline: true,
+    createdAt: DateTime.now(),
+  );
+
+  final userAmit = UserModel(
+    uid: 'u_amit',
+    name: 'Amit Patel',
+    phoneNumber: '+919123456789',
+    isOnline: false,
+    createdAt: DateTime.now(),
+  );
+
+  final userSelf = UserModel(
+    uid: 'u_self',
+    name: 'Deepak Mewada',
+    phoneNumber: '+919999900000',
+    isOnline: true,
+    createdAt: DateTime.now(),
+  );
+
+  group('UserModel Null-Safety & Normalization Tests', () {
     test('fromMap gracefully handles empty map with null values', () {
       final user = UserModel.fromMap(const {});
 
@@ -53,372 +151,520 @@ void main() {
       expect(user.profileImage, '');
       expect(user.isOnline, false);
       expect(user.createdAt, isA<DateTime>());
+      expect(user.effectiveNormalizedPhone, '');
     });
 
-    test('fromMap correctly parses documentId if not in map', () {
+    test('fromMap correctly parses documentId and normalizedPhoneNumber', () {
       final user = UserModel.fromMap(
-        {'name': 'Alex', 'phoneNumber': '+919876543210'},
+        {
+          'name': 'Alex',
+          'phoneNumber': '9876543210',
+          'normalizedPhoneNumber': '+919876543210',
+        },
         documentId: 'doc_123',
       );
 
       expect(user.uid, 'doc_123');
       expect(user.name, 'Alex');
-      expect(user.phoneNumber, '+919876543210');
-      expect(user.isOnline, false);
+      expect(user.phoneNumber, '9876543210');
+      expect(user.normalizedPhoneNumber, '+919876543210');
+      expect(user.effectiveNormalizedPhone, '+919876543210');
     });
 
-    test('fromMap parses string-based createdAt correctly', () {
-      final user = UserModel.fromMap({
-        'uid': 'u1',
-        'createdAt': '2026-09-08T00:00:00.000Z',
-      });
+    test('toMap saves normalizedPhoneNumber automatically', () {
+      final user = UserModel(
+        uid: 'u1',
+        name: 'User One',
+        phoneNumber: '09876543210',
+        createdAt: DateTime.now(),
+      );
 
-      expect(user.createdAt.year, 2026);
+      final map = user.toMap();
+      expect(map['phoneNumber'], '09876543210');
+      expect(map['normalizedPhoneNumber'], '+919876543210');
     });
   });
 
-  group('ContactsController Tests', () {
-    final userCurrent = UserModel(
-      uid: 'user_current',
-      name: 'Current User',
-      phoneNumber: '+919999900000',
-      createdAt: DateTime.now(),
-    );
-
-    final userAlice = UserModel(
-      uid: 'user_alice',
-      name: 'Alice Johnson',
-      phoneNumber: '+919876543210',
-      isOnline: true,
-      createdAt: DateTime.now(),
-    );
-
-    final userBob = UserModel(
-      uid: 'user_bob',
-      name: 'Bob Smith',
-      phoneNumber: '+919123456789',
-      isOnline: false,
-      createdAt: DateTime.now(),
-    );
-
-    test('loadUsers successfully excludes current user', () async {
-      final mockUserService = MockUserService(
-        mockUsers: [userCurrent, userAlice, userBob],
+  group('Phase 2 Required Scenarios (Step 21)', () {
+    // 1. Permission granted flow
+    test('Scenario 1: Permission granted flow fetches and matches contacts', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.granted,
+        mockContacts: [
+          const DeviceContact(
+            displayName: 'Rahul Local',
+            phoneNumbers: ['+91 98765 43210'],
+          ),
+        ],
       );
-      final mockAuthService = MockAuthService(mockUid: 'user_current');
+      final userService = MockUserService(registeredUsers: [userRahul]);
+      final authService = MockAuthService(mockUid: 'u_self');
 
       final controller = ContactsController(
-        userService: mockUserService,
-        authService: mockAuthService,
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
+        currentUserIdOverride: 'u_self',
       );
 
-      // Wait for initial load
-      await controller.loadUsers();
+      await controller.initContacts();
+
+      expect(controller.permissionState.value, ContactsPermissionState.granted);
+      expect(controller.users.length, 1);
+      expect(controller.users.first.name, 'Rahul Sharma'); // Profile name used
+      expect(controller.isLoading.value, isFalse);
+    });
+
+    // 2. Permission denied flow
+    test('Scenario 2: Permission denied flow transitions state properly', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.denied,
+        mockRequestResultStatus: PermissionStatus.denied,
+      );
+      final userService = MockUserService();
+      final authService = MockAuthService(mockUid: 'u_self');
+
+      final controller = ContactsController(
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
+      );
+
+      await controller.initContacts();
+
+      expect(controller.permissionState.value, ContactsPermissionState.denied);
+      expect(controller.users, isEmpty);
+    });
+
+    // 3. Permission permanently denied flow
+    test('Scenario 3: Permanently denied flow transitions state and opens settings', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.permanentlyDenied,
+      );
+      final userService = MockUserService();
+      final authService = MockAuthService(mockUid: 'u_self');
+
+      final controller = ContactsController(
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
+      );
+
+      await controller.initContacts();
+
+      expect(controller.permissionState.value, ContactsPermissionState.permanentlyDenied);
+
+      await controller.openSettings();
+      expect(contactService.openSettingsCalled, isTrue);
+    });
+
+    // 4. Normalization of various phone formats
+    test('Scenario 4: Normalizes +91, spaces, dashes, 0-prefix, and 91-prefix correctly', () {
+      expect(PhoneNumberUtil.normalize('+91 98765 43210'), '+919876543210');
+      expect(PhoneNumberUtil.normalize('+91-9876543210'), '+919876543210');
+      expect(PhoneNumberUtil.normalize('09876543210'), '+919876543210');
+      expect(PhoneNumberUtil.normalize('9876543210'), '+919876543210');
+      expect(PhoneNumberUtil.normalize('919876543210'), '+919876543210');
+      expect(PhoneNumberUtil.normalize('00919876543210'), '+919876543210');
+    });
+
+    // 5. Exclude non-registered contacts
+    test('Scenario 5: Only registered contacts are matched and returned', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.granted,
+        mockContacts: [
+          const DeviceContact(displayName: 'Rahul', phoneNumbers: ['+91 98765 43210']),
+          const DeviceContact(displayName: 'Amit', phoneNumbers: ['+91 91234 56789']),
+          const DeviceContact(displayName: 'Unregistered 1', phoneNumbers: ['+91 88888 88888']),
+          const DeviceContact(displayName: 'Unregistered 2', phoneNumbers: ['+91 77777 77777']),
+        ],
+      );
+      final userService = MockUserService(
+        registeredUsers: [userRahul, userAmit],
+      );
+      final authService = MockAuthService(mockUid: 'u_self');
+
+      final controller = ContactsController(
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
+        currentUserIdOverride: 'u_self',
+      );
+
+      await controller.loadContacts();
 
       expect(controller.users.length, 2);
-      expect(controller.users.any((u) => u.uid == 'user_current'), isFalse);
-      expect(controller.users.any((u) => u.uid == 'user_alice'), isTrue);
-      expect(controller.users.any((u) => u.uid == 'user_bob'), isTrue);
-      expect(controller.errorMessage.value, isEmpty);
-      expect(controller.isLoading.value, isFalse);
+      expect(controller.users.any((u) => u.uid == 'u_rahul'), isTrue);
+      expect(controller.users.any((u) => u.uid == 'u_amit'), isTrue);
     });
 
-    test('Search filters users by name case-insensitively', () async {
-      final mockUserService = MockUserService(
-        mockUsers: [userAlice, userBob],
+    // 6. Exclude current logged in user
+    test('Scenario 6: Current logged-in user is strictly excluded from list', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.granted,
+        mockContacts: [
+          const DeviceContact(displayName: 'My Own Number', phoneNumbers: ['+91 99999 00000']),
+          const DeviceContact(displayName: 'Rahul', phoneNumbers: ['+91 98765 43210']),
+        ],
       );
-      final mockAuthService = MockAuthService(mockUid: 'user_other');
+      final userService = MockUserService(
+        registeredUsers: [userSelf, userRahul],
+      );
+      final authService = MockAuthService(mockUid: 'u_self');
 
       final controller = ContactsController(
-        userService: mockUserService,
-        authService: mockAuthService,
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
+        currentUserIdOverride: 'u_self',
+        currentUserPhoneOverride: '+919999900000',
       );
-      await controller.loadUsers();
 
-      // Lowercase search
-      controller.onSearchChanged('alice');
-      expect(controller.filteredUsers.length, 1);
-      expect(controller.filteredUsers.first.name, 'Alice Johnson');
+      await controller.loadContacts();
 
-      // Uppercase search
-      controller.onSearchChanged('ALICE');
-      expect(controller.filteredUsers.length, 1);
-      expect(controller.filteredUsers.first.name, 'Alice Johnson');
-
-      // Partial name
-      controller.onSearchChanged('john');
-      expect(controller.filteredUsers.length, 1);
-      expect(controller.filteredUsers.first.name, 'Alice Johnson');
-
-      // Clear search
-      controller.clearSearch();
-      expect(controller.filteredUsers.length, 2);
-      expect(controller.searchQuery.value, isEmpty);
+      expect(controller.users.length, 1);
+      expect(controller.users.first.uid, 'u_rahul');
+      expect(controller.users.any((u) => u.uid == 'u_self'), isFalse);
     });
 
-    test('Search filters users by phone number case-insensitively', () async {
-      final mockUserService = MockUserService(
-        mockUsers: [userAlice, userBob],
+    // 7. Deduplication of contacts
+    test('Scenario 7: Duplicate numbers in device contacts produce deduplicated query and list', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.granted,
+        mockContacts: [
+          const DeviceContact(displayName: 'Rahul Home', phoneNumbers: ['09876543210']),
+          const DeviceContact(displayName: 'Rahul Work', phoneNumbers: ['+91 98765 43210']),
+          const DeviceContact(displayName: 'Rahul Mobile', phoneNumbers: ['9876543210']),
+        ],
       );
-      final mockAuthService = MockAuthService(mockUid: 'user_other');
+      final userService = MockUserService(registeredUsers: [userRahul]);
+      final authService = MockAuthService(mockUid: 'u_self');
 
       final controller = ContactsController(
-        userService: mockUserService,
-        authService: mockAuthService,
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
+        currentUserIdOverride: 'u_self',
       );
-      await controller.loadUsers();
 
-      controller.onSearchChanged('12345');
-      expect(controller.filteredUsers.length, 1);
-      expect(controller.filteredUsers.first.name, 'Bob Smith');
+      await controller.loadContacts();
+
+      expect(controller.users.length, 1);
+      expect(controller.users.first.uid, 'u_rahul');
+      expect(userService.lastQueriedNumbers.length, 1);
+      expect(userService.lastQueriedNumbers.first, '+919876543210');
     });
 
-    test('Non-matching search returns empty list', () async {
-      final mockUserService = MockUserService(
-        mockUsers: [userAlice, userBob],
+    // 8. Empty contacts list on device
+    test('Scenario 8: Empty device contacts produces empty list without errors', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.granted,
+        mockContacts: [],
       );
-      final mockAuthService = MockAuthService(mockUid: 'user_other');
+      final userService = MockUserService(registeredUsers: [userRahul, userAmit]);
+      final authService = MockAuthService(mockUid: 'u_self');
 
       final controller = ContactsController(
-        userService: mockUserService,
-        authService: mockAuthService,
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
       );
-      await controller.loadUsers();
 
-      controller.onSearchChanged('NonExistentUser123');
-      expect(controller.filteredUsers, isEmpty);
-    });
-
-    test('Handles service error cleanly and sets errorMessage', () async {
-      final mockUserService = MockUserService(shouldThrow: true);
-      final mockAuthService = MockAuthService(mockUid: 'user_1');
-
-      final controller = ContactsController(
-        userService: mockUserService,
-        authService: mockAuthService,
-      );
-      await controller.loadUsers();
+      await controller.loadContacts();
 
       expect(controller.users, isEmpty);
-      expect(controller.errorMessage.value, 'Unable to load contacts');
-      expect(controller.isLoading.value, isFalse);
+      expect(controller.errorMessage.value, isEmpty);
+    });
+
+    // 9. Empty registered match (contacts exist on phone, but 0 registered in app)
+    test('Scenario 9: Contacts exist on phone but none registered', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.granted,
+        mockContacts: [
+          const DeviceContact(displayName: 'Unregistered 1', phoneNumbers: ['+91 88888 88888']),
+          const DeviceContact(displayName: 'Unregistered 2', phoneNumbers: ['+91 77777 77777']),
+        ],
+      );
+      final userService = MockUserService(registeredUsers: []);
+      final authService = MockAuthService(mockUid: 'u_self');
+
+      final controller = ContactsController(
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
+      );
+
+      await controller.loadContacts();
+
+      expect(controller.users, isEmpty);
+      expect(controller.errorMessage.value, isEmpty);
+    });
+
+    // 10. Search filtering by name
+    test('Scenario 10: Search filtering matches users by name case-insensitively', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.granted,
+        mockContacts: [
+          const DeviceContact(displayName: 'Rahul', phoneNumbers: ['+91 98765 43210']),
+          const DeviceContact(displayName: 'Amit', phoneNumbers: ['+91 91234 56789']),
+        ],
+      );
+      final userService = MockUserService(registeredUsers: [userRahul, userAmit]);
+      final authService = MockAuthService(mockUid: 'u_self');
+
+      final controller = ContactsController(
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
+        currentUserIdOverride: 'u_self',
+      );
+
+      await controller.loadContacts();
+      expect(controller.users.length, 2);
+
+      controller.onSearchChanged('rahul');
+      expect(controller.filteredUsers.length, 1);
+      expect(controller.filteredUsers.first.name, 'Rahul Sharma');
+
+      controller.onSearchChanged('AMIT');
+      expect(controller.filteredUsers.length, 1);
+      expect(controller.filteredUsers.first.name, 'Amit Patel');
+    });
+
+    // 11. Search filtering by phone
+    test('Scenario 11: Search filtering matches users by phone number', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.granted,
+        mockContacts: [
+          const DeviceContact(displayName: 'Rahul', phoneNumbers: ['+91 98765 43210']),
+          const DeviceContact(displayName: 'Amit', phoneNumbers: ['+91 91234 56789']),
+        ],
+      );
+      final userService = MockUserService(registeredUsers: [userRahul, userAmit]);
+      final authService = MockAuthService(mockUid: 'u_self');
+
+      final controller = ContactsController(
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
+        currentUserIdOverride: 'u_self',
+      );
+
+      await controller.loadContacts();
+
+      controller.onSearchChanged('91234');
+      expect(controller.filteredUsers.length, 1);
+      expect(controller.filteredUsers.first.name, 'Amit Patel');
+    });
+
+    // 12. Audio call button triggers audio call
+    test('Scenario 12: Audio call triggers ZegoCallService audio invitation', () async {
+      final callService = MockZegoCallService();
+      final controller = ContactsController(
+        zegoCallService: callService,
+        contactService: MockContactService(),
+        userService: MockUserService(),
+        authService: MockAuthService(),
+      );
+
+      await controller.onAudioCallTap(userRahul);
+      expect(callService.lastAudioTarget?.uid, 'u_rahul');
+    });
+
+    // 13. Video call button triggers video call
+    test('Scenario 13: Video call triggers ZegoCallService video invitation', () async {
+      final callService = MockZegoCallService();
+      final controller = ContactsController(
+        zegoCallService: callService,
+        contactService: MockContactService(),
+        userService: MockUserService(),
+        authService: MockAuthService(),
+      );
+
+      await controller.onVideoCallTap(userAmit);
+      expect(callService.lastVideoTarget?.uid, 'u_amit');
+    });
+
+    // 14. Pull to refresh triggers reload
+    test('Scenario 14: Refresh contacts re-runs matching pipeline', () async {
+      final contactService = MockContactService(
+        mockPermissionStatus: PermissionStatus.granted,
+        mockContacts: [
+          const DeviceContact(displayName: 'Rahul', phoneNumbers: ['+91 98765 43210']),
+        ],
+      );
+      final userService = MockUserService(registeredUsers: [userRahul]);
+      final authService = MockAuthService(mockUid: 'u_self');
+
+      final controller = ContactsController(
+        contactService: contactService,
+        userService: userService,
+        authService: authService,
+        currentUserIdOverride: 'u_self',
+      );
+
+      await controller.loadContacts();
+      expect(controller.users.length, 1);
+
+      // Now add Amit to contacts and refresh
+      contactService.mockContacts = [
+        const DeviceContact(displayName: 'Rahul', phoneNumbers: ['+91 98765 43210']),
+        const DeviceContact(displayName: 'Amit', phoneNumbers: ['+91 91234 56789']),
+      ];
+      userService.registeredUsers.add(userAmit);
+
+      await controller.refreshContacts();
+      expect(controller.users.length, 2);
+    });
+
+    // 15. Batch query chunking
+    test('Scenario 15: UserService.chunkList chunks 75 numbers into [30, 30, 15]', () {
+      final numbers = List.generate(75, (i) => '+9190000000${i.toString().padLeft(2, '0')}');
+      final chunks = UserService.chunkList(numbers, 30);
+
+      expect(chunks.length, 3);
+      expect(chunks[0].length, 30);
+      expect(chunks[1].length, 30);
+      expect(chunks[2].length, 15);
+      expect(chunks[0].first, '+919000000000');
+      expect(chunks[2].last, '+919000000074');
     });
   });
 
-  group('UserTile Widget Tests', () {
-    testWidgets('Renders contact details and handles call button taps',
-        (WidgetTester tester) async {
-      bool audioTapped = false;
-      bool videoTapped = false;
-
-      final testUser = UserModel(
-        uid: 'user_test',
-        name: 'Jane Doe',
-        phoneNumber: '+919876543210',
-        isOnline: true,
-        createdAt: DateTime.now(),
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: UserTile(
-              user: testUser,
-              onAudioCall: () => audioTapped = true,
-              onVideoCall: () => videoTapped = true,
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('Jane Doe'), findsOneWidget);
-      expect(find.text('Online'), findsOneWidget);
-      expect(find.text('+919876543210'), findsOneWidget);
-      expect(find.byIcon(Icons.call_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.videocam_rounded), findsOneWidget);
-
-      // Tap audio button
-      await tester.tap(find.byIcon(Icons.call_rounded));
-      expect(audioTapped, isTrue);
-
-      // Tap video button
-      await tester.tap(find.byIcon(Icons.videocam_rounded));
-      expect(videoTapped, isTrue);
-    });
-
-    testWidgets('Displays Offline indicator when isOnline is false',
-        (WidgetTester tester) async {
-      final offlineUser = UserModel(
-        uid: 'user_offline',
-        name: 'Offline Bob',
-        phoneNumber: '+919111122222',
-        isOnline: false,
-        createdAt: DateTime.now(),
-      );
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: UserTile(
-              user: offlineUser,
-              onAudioCall: () {},
-              onVideoCall: () {},
-            ),
-          ),
-        ),
-      );
-
-      expect(find.text('Offline'), findsOneWidget);
-    });
-  });
-
-  group('ContactsScreen Widget Tests', () {
-    testWidgets('Renders contacts list and interacts with search field',
-        (WidgetTester tester) async {
-      final userAlice = UserModel(
-        uid: 'u1',
-        name: 'Alice Springs',
-        phoneNumber: '+919888877777',
-        isOnline: true,
-        createdAt: DateTime.now(),
-      );
-      final userCharlie = UserModel(
-        uid: 'u2',
-        name: 'Charlie Brown',
-        phoneNumber: '+919666655555',
-        isOnline: false,
-        createdAt: DateTime.now(),
-      );
-
+  group('ContactsScreen Widget State Tests', () {
+    testWidgets('Renders Permission Denied state with Grant button', (tester) async {
       final controller = ContactsController(
-        userService: MockUserService(mockUsers: [userAlice, userCharlie]),
+        contactService: MockContactService(
+          mockPermissionStatus: PermissionStatus.denied,
+          mockRequestResultStatus: PermissionStatus.denied,
+        ),
+        userService: MockUserService(),
         authService: MockAuthService(mockUid: 'self'),
       );
 
       Get.put<ContactsController>(controller);
 
       await tester.pumpWidget(
-        const GetMaterialApp(
-          home: ContactsScreen(),
-        ),
+        const GetMaterialApp(home: ContactsScreen()),
       );
-
-      // Verify header and search field
-      expect(find.text('Contacts'), findsOneWidget);
-      expect(find.text('Connect with people'), findsOneWidget);
-      expect(find.text('Search contacts...'), findsOneWidget);
-
-      // Wait for async loadUsers
       await tester.pumpAndSettle();
 
-      // Both contacts should be visible
-      expect(find.text('Alice Springs'), findsOneWidget);
-      expect(find.text('Charlie Brown'), findsOneWidget);
-
-      // Enter search text
-      await tester.enterText(find.byType(TextField), 'Alice');
-      await tester.pumpAndSettle();
-
-      expect(find.text('Alice Springs'), findsOneWidget);
-      expect(find.text('Charlie Brown'), findsNothing);
-
-      // Tap clear search button
-      await tester.tap(find.byIcon(Icons.close_rounded));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Alice Springs'), findsOneWidget);
-      expect(find.text('Charlie Brown'), findsOneWidget);
+      expect(find.text('Permission Required'), findsOneWidget);
+      expect(
+        find.text('Contacts permission is required to find your friends on ConnectCall.'),
+        findsOneWidget,
+      );
+      expect(find.text('Grant Permission'), findsOneWidget);
     });
 
-    testWidgets('Displays empty search result state',
-        (WidgetTester tester) async {
+    testWidgets('Renders Permission Permanently Denied state with Open Settings button',
+        (tester) async {
       final controller = ContactsController(
-        userService: MockUserService(mockUsers: [
-          UserModel(
-            uid: 'u1',
-            name: 'Alice',
-            phoneNumber: '+919876543210',
-            createdAt: DateTime.now(),
-          ),
-        ]),
+        contactService: MockContactService(
+          mockPermissionStatus: PermissionStatus.permanentlyDenied,
+        ),
+        userService: MockUserService(),
         authService: MockAuthService(mockUid: 'self'),
       );
 
       Get.put<ContactsController>(controller);
 
       await tester.pumpWidget(
-        const GetMaterialApp(
-          home: ContactsScreen(),
-        ),
+        const GetMaterialApp(home: ContactsScreen()),
       );
       await tester.pumpAndSettle();
 
-      // Enter non-matching query
-      await tester.enterText(find.byType(TextField), 'XYZNonExistent');
-      await tester.pumpAndSettle();
-
-      expect(find.text('No contacts found'), findsOneWidget);
-      expect(find.text('Try a different name or phone number.'), findsOneWidget);
+      expect(find.text('Permission Needed'), findsOneWidget);
+      expect(
+        find.text('Contacts permission is permanently denied. Please enable it from Settings.'),
+        findsOneWidget,
+      );
+      expect(find.text('Open Settings'), findsOneWidget);
     });
 
-    testWidgets('Displays error state with retry button on failure',
-        (WidgetTester tester) async {
+    testWidgets('Renders Empty state when no registered contacts found', (tester) async {
       final controller = ContactsController(
-        userService: MockUserService(shouldThrow: true),
+        contactService: MockContactService(
+          mockPermissionStatus: PermissionStatus.granted,
+          mockContacts: [],
+        ),
+        userService: MockUserService(registeredUsers: []),
         authService: MockAuthService(mockUid: 'self'),
       );
 
       Get.put<ContactsController>(controller);
 
       await tester.pumpWidget(
-        const GetMaterialApp(
-          home: ContactsScreen(),
-        ),
+        const GetMaterialApp(home: ContactsScreen()),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Unable to load contacts'), findsOneWidget);
+      expect(find.text('No registered contacts found.'), findsOneWidget);
+      expect(
+        find.text('None of your phone contacts are registered on ConnectCall yet.'),
+        findsOneWidget,
+      );
+      expect(find.text('Refresh Contacts'), findsOneWidget);
+    });
+
+    testWidgets('Renders Network Error state with Retry button', (tester) async {
+      final controller = ContactsController(
+        contactService: MockContactService(
+          mockPermissionStatus: PermissionStatus.granted,
+          mockContacts: [
+            const DeviceContact(displayName: 'Test', phoneNumbers: ['+91 98765 43210']),
+          ],
+        ),
+        userService: MockUserService(throwNetwork: true),
+        authService: MockAuthService(mockUid: 'self'),
+      );
+
+      Get.put<ContactsController>(controller);
+
+      await tester.pumpWidget(
+        const GetMaterialApp(home: ContactsScreen()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Network Error'), findsOneWidget);
+      expect(find.text('Network error. Please check your connection.'), findsOneWidget);
       expect(find.text('Retry'), findsOneWidget);
     });
 
-    testWidgets('Audio Call and Video Call tap triggers placeholder feedback',
-        (WidgetTester tester) async {
+    testWidgets('Renders matched users and handles call button taps', (tester) async {
+      final callService = MockZegoCallService();
       final controller = ContactsController(
-        userService: MockUserService(mockUsers: [
-          UserModel(
-            uid: 'u1',
-            name: 'Sarah Connor',
-            phoneNumber: '+919999988888',
-            createdAt: DateTime.now(),
-          ),
-        ]),
+        zegoCallService: callService,
+        contactService: MockContactService(
+          mockPermissionStatus: PermissionStatus.granted,
+          mockContacts: [
+            const DeviceContact(displayName: 'Rahul Contact', phoneNumbers: ['09876543210']),
+          ],
+        ),
+        userService: MockUserService(registeredUsers: [userRahul]),
         authService: MockAuthService(mockUid: 'self'),
       );
 
       Get.put<ContactsController>(controller);
 
       await tester.pumpWidget(
-        const GetMaterialApp(
-          home: ContactsScreen(),
-        ),
+        const GetMaterialApp(home: ContactsScreen()),
       );
       await tester.pumpAndSettle();
 
-      // Tap Audio Call button
+      // Displays registered user name
+      expect(find.text('Rahul Sharma'), findsOneWidget);
+      expect(find.text('+919876543210'), findsOneWidget);
+
+      // Tap audio call
       await tester.tap(find.byIcon(Icons.call_rounded));
-      await tester.pump();
-      expect(find.byIcon(Icons.call_rounded), findsOneWidget);
-
-      await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
+      expect(callService.lastAudioTarget?.uid, 'u_rahul');
 
-      // Tap Video Call button
+      // Tap video call
       await tester.tap(find.byIcon(Icons.videocam_rounded));
-      await tester.pump();
-      expect(find.byIcon(Icons.videocam_rounded), findsOneWidget);
-
-      await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
+      expect(callService.lastVideoTarget?.uid, 'u_rahul');
     });
   });
 }

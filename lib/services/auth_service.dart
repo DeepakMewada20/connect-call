@@ -34,6 +34,9 @@ class AuthService {
     }
   }
 
+  // Convenience getter for current Firebase User
+  User? get currentUser => getCurrentUser();
+
   // Get current user UID safely
   String? get currentUserId {
     try {
