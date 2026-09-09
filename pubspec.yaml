@@ -49,6 +49,8 @@ dependencies:
   zego_uikit_signaling_plugin: ^2.8.21
   zego_uikit: ^2.29.2
   pinput: ^6.0.2
+  firebase_messaging: ^16.4.1
+  flutter_local_notifications: ^22.0.1
 
 dev_dependencies:
   flutter_test:

@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'fcm_service.dart';
 
 class AuthService {
   final FirebaseAuth? _injectedAuth;
@@ -122,6 +123,12 @@ class AuthService {
   // Logout from Firebase
   Future<void> logout() async {
     try {
+      final uid = currentUserId;
+      if (uid != null && uid.isNotEmpty) {
+        try {
+          await FcmService.instance.cleanFcmToken(uid);
+        } catch (_) {}
+      }
       await _instance.signOut();
     } catch (e) {
       debugPrint('AuthService.logout error: $e');

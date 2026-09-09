@@ -1,9 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_constants.dart';
 import '../../routes/app_routes.dart';
+import '../../services/fcm_service.dart';
+import '../../services/pending_call_manager.dart';
 import '../../services/user_service.dart';
+import '../calling/incoming_call_decision_dialog.dart';
 
 class SplashController extends GetxController {
   // Optional authStateChecker for unit testing / mocking
@@ -50,7 +53,22 @@ class SplashController extends GetxController {
         if (user != null) {
           final profile = await _userService.getUser(user.uid);
           if (profile != null && profile.name.trim().isNotEmpty) {
+            // Sync FCM token upon successful authentication
+            FcmService.instance.syncFcmToken();
+
+            // Check if application was launched from incoming call notification
+            final pendingCall = await PendingCallManager.instance.getPendingCall();
+
             Get.offAllNamed(AppRoutes.home);
+
+            if (pendingCall != null && !pendingCall.isExpired) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                final ctx = Get.context;
+                if (ctx != null) {
+                  IncomingCallDecisionDialog.show(ctx, pendingCall);
+                }
+              });
+            }
           } else {
             Get.offAllNamed(
               AppRoutes.name,

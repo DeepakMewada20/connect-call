@@ -8,6 +8,8 @@ class UserModel {
   final String? normalizedPhoneNumber;
   final String profileImage;
   final bool isOnline;
+  final String? fcmToken;
+  final DateTime? fcmUpdatedAt;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -18,6 +20,8 @@ class UserModel {
     this.normalizedPhoneNumber,
     this.profileImage = '',
     this.isOnline = false,
+    this.fcmToken,
+    this.fcmUpdatedAt,
     required this.createdAt,
     this.updatedAt,
   });
@@ -36,6 +40,8 @@ class UserModel {
       if (normalized != null && normalized.isNotEmpty) 'normalizedPhoneNumber': normalized,
       'profileImage': profileImage,
       'isOnline': isOnline,
+      if (fcmToken != null) 'fcmToken': fcmToken,
+      if (fcmUpdatedAt != null) 'fcmUpdatedAt': Timestamp.fromDate(fcmUpdatedAt!),
       'createdAt': Timestamp.fromDate(createdAt),
       if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
     };
@@ -61,6 +67,14 @@ class UserModel {
       parsedUpdatedAt = DateTime.tryParse(rawUpdatedAt);
     }
 
+    DateTime? parsedFcmUpdatedAt;
+    final rawFcmUpdatedAt = map['fcmUpdatedAt'];
+    if (rawFcmUpdatedAt is Timestamp) {
+      parsedFcmUpdatedAt = rawFcmUpdatedAt.toDate();
+    } else if (rawFcmUpdatedAt is String) {
+      parsedFcmUpdatedAt = DateTime.tryParse(rawFcmUpdatedAt);
+    }
+
     final rawPhone = map['phoneNumber'] as String? ?? '';
     final rawNormalized = map['normalizedPhoneNumber'] as String?;
 
@@ -71,6 +85,8 @@ class UserModel {
       normalizedPhoneNumber: rawNormalized ?? PhoneNumberUtil.normalize(rawPhone),
       profileImage: map['profileImage'] as String? ?? '',
       isOnline: map['isOnline'] as bool? ?? false,
+      fcmToken: map['fcmToken'] as String?,
+      fcmUpdatedAt: parsedFcmUpdatedAt,
       createdAt: parsedCreatedAt,
       updatedAt: parsedUpdatedAt,
     );
@@ -84,6 +100,8 @@ class UserModel {
     String? normalizedPhoneNumber,
     String? profileImage,
     bool? isOnline,
+    String? fcmToken,
+    DateTime? fcmUpdatedAt,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -94,6 +112,8 @@ class UserModel {
       normalizedPhoneNumber: normalizedPhoneNumber ?? this.normalizedPhoneNumber,
       profileImage: profileImage ?? this.profileImage,
       isOnline: isOnline ?? this.isOnline,
+      fcmToken: fcmToken ?? this.fcmToken,
+      fcmUpdatedAt: fcmUpdatedAt ?? this.fcmUpdatedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

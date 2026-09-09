@@ -11,6 +11,7 @@ import '../core/theme/app_theme.dart';
 import '../models/call_model.dart';
 import '../models/user_model.dart';
 import '../models/zego_token_response.dart';
+import '../models/pending_call_model.dart';
 import '../routes/app_routes.dart';
 import '../screens/calling/custom_audio_calling_view.dart';
 import '../screens/calling/invite_participant_sheet.dart';
@@ -18,6 +19,8 @@ import '../screens/home/home_controller.dart';
 import 'auth_service.dart';
 import 'block_service.dart';
 import 'call_history_service.dart';
+import 'call_notification_service.dart';
+import 'pending_call_manager.dart';
 import 'user_service.dart';
 
 /// ZegoCallService manages 1-to-1 audio calling via ZEGOCLOUD Call Kit.
@@ -391,6 +394,10 @@ class ZegoCallService {
                 ? activeCallId.value
                 : (_currentSessionCallId ?? '');
             if (targetCallId.isNotEmpty) {
+              _dispatchFcmCallCancel(
+                receiverUid: _currentSessionTargetUid ?? '',
+                callId: targetCallId,
+              );
               await _callHistoryService.updateCallStatus(
                 callId: targetCallId,
                 status: 'ended',
@@ -804,7 +811,15 @@ class ZegoCallService {
         timeoutSeconds: 60,
       );
 
-      if (!sent) {
+      if (sent) {
+        _dispatchFcmCallPush(
+          receiverUid: targetUser.uid,
+          callId: callID,
+          callType: 'audio',
+          callerName: currentName,
+          callerPhoto: _authService.getCurrentUser()?.photoURL,
+        );
+      } else {
         await _callHistoryService.updateCallStatus(
           callId: callID,
           status: 'failed',
@@ -982,7 +997,15 @@ class ZegoCallService {
         timeoutSeconds: 60,
       );
 
-      if (!sent) {
+      if (sent) {
+        _dispatchFcmCallPush(
+          receiverUid: targetUser.uid,
+          callId: callID,
+          callType: 'video',
+          callerName: currentName,
+          callerPhoto: _authService.getCurrentUser()?.photoURL,
+        );
+      } else {
         await _callHistoryService.updateCallStatus(
           callId: callID,
           status: 'failed',
@@ -1320,5 +1343,262 @@ class ZegoCallService {
         Get.back();
       },
     );
+  }
+
+  // --- Phase 10: FCM Push Dispatch & Notification Entry Points ---
+
+  Future<void> Function(PendingCallModel call)? acceptNotificationCallDelegate;
+  Future<void> Function(PendingCallModel call)? rejectNotificationCallDelegate;
+
+  void _dispatchFcmCallPush({
+    required String receiverUid,
+    required String callId,
+    required String callType,
+    required String callerName,
+    String? callerPhoto,
+  }) async {
+    if (Get.testMode) return;
+    try {
+      final res = await _functions.httpsCallable('sendCallNotification').call({
+        'receiverUid': receiverUid,
+        'callId': callId,
+        'callType': callType,
+        'callerName': callerName,
+        'callerZegoUserId': _authService.currentUserId,
+        'callerPhoto': callerPhoto,
+      });
+      debugPrint('[FCM] Dispatched call notification result: ${res.data}');
+    } catch (e) {
+      debugPrint('[FCM] sendCallNotification error: $e');
+    }
+  }
+
+  void _dispatchFcmCallCancel({required String receiverUid, required String callId}) async {
+    if (Get.testMode) return;
+    try {
+      await _functions.httpsCallable('cancelCallNotification').call({
+        'receiverUid': receiverUid,
+        'callId': callId,
+      });
+      debugPrint('[FCM] Dispatched call cancel for call: $callId');
+    } catch (e) {
+      debugPrint('[FCM] cancelCallNotification error: $e');
+    }
+  }
+
+  /// Accepts an incoming call received from push notification (converges into existing call pipeline)
+  Future<void> acceptCallFromNotification(PendingCallModel call) async {
+    debugPrint('[CALL PUSH] Existing Accept logic invoked for call: ${call.callId} (${call.callType})');
+
+    // 1. Verify call is not expired
+    if (call.isExpired) {
+      debugPrint('[CALL PUSH] Pending call ${call.callId} expired. Discarding.');
+      await CallNotificationService.instance.dismissNotification(call.callId);
+      await PendingCallManager.instance.clearPendingCall();
+      if (!Get.testMode) {
+        Get.snackbar(
+          'Call Expired',
+          'This incoming call invitation has expired.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.amber.shade800,
+          colorText: Colors.white,
+        );
+      }
+      return;
+    }
+
+    // 2. Centralized non-bypassable block check
+    if (await _blockService.isUserBlocked(targetUid: call.callerUid)) {
+      debugPrint('[CALL PUSH] Rejecting call from blocked user ${call.callerUid}');
+      await rejectCallFromNotification(call);
+      return;
+    }
+
+    // 3. Dismiss notification and clear pending state
+    await CallNotificationService.instance.dismissNotification(call.callId);
+    await PendingCallManager.instance.clearPendingCall();
+
+    if (acceptNotificationCallDelegate != null) {
+      await acceptNotificationCallDelegate!(call);
+      return;
+    }
+
+    // 4. Ensure CallService is initialized
+    if (!isInitialized.value) {
+      final ok = await initZegoCallService();
+      if (!ok && !Get.testMode) {
+        debugPrint('[CALL PUSH] Failed to initialize ZegoCallService on accept.');
+        return;
+      }
+    }
+
+    activeCallId.value = call.callId;
+    _currentSessionCallId = call.callId;
+    _callConnectedAt = DateTime.now();
+    _currentSessionIsVideo = call.isVideo;
+    _currentSessionTargetUid = call.callerUid;
+    _currentSessionTargetName = call.callerName;
+
+    // 5. Update local SQLite call history
+    final currentUid = _authService.currentUserId ?? '';
+    final currentName = _authService.getCurrentUser()?.displayName ?? 'User';
+
+    await _callHistoryService.saveCallRecord(
+      CallModel(
+        id: call.callId,
+        callerId: call.callerUid,
+        callerName: call.callerName,
+        callerPhoto: call.callerPhoto,
+        calleeId: currentUid,
+        calleeName: currentName,
+        calleePhoto: _authService.getCurrentUser()?.photoURL,
+        callType: call.callType,
+        direction: 'incoming',
+        status: 'connected',
+        startedAt: DateTime.now(),
+        durationSeconds: 0,
+      ),
+    );
+
+    if (Get.testMode) return;
+
+    // 6. Navigate to active call screen
+    final nav = navigatorKey.currentState ?? Get.key.currentState;
+    if (nav != null) {
+      if (call.isVideo) {
+        final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVideoCall();
+        config.turnOnCameraWhenJoining = true;
+        config.turnOnMicrophoneWhenJoining = true;
+        config.useSpeakerWhenJoining = true;
+        nav.push(
+          MaterialPageRoute(
+            builder: (context) => ZegoUIKitPrebuiltCall(
+              appID: 0,
+              appSign: '',
+              userID: currentUid,
+              userName: currentName,
+              callID: call.callId,
+              config: config,
+              events: ZegoUIKitPrebuiltCallEvents(
+                onCallEnd: (event, defaultAction) async {
+                  _handleCallEndCleanUp(event, defaultAction);
+                },
+              ),
+            ),
+          ),
+        );
+      } else {
+        final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall();
+        nav.push(
+          MaterialPageRoute(
+            builder: (context) => ZegoUIKitPrebuiltCall(
+              appID: 0,
+              appSign: '',
+              userID: currentUid,
+              userName: currentName,
+              callID: call.callId,
+              config: config,
+              events: ZegoUIKitPrebuiltCallEvents(
+                onCallEnd: (event, defaultAction) async {
+                  _handleCallEndCleanUp(event, defaultAction);
+                },
+              ),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  /// Rejects an incoming call received from push notification (converges into existing call pipeline)
+  Future<void> rejectCallFromNotification(PendingCallModel call) async {
+    debugPrint('[CALL PUSH] Existing Reject logic invoked for call: ${call.callId}');
+
+    // 1. Dismiss notification and stop ringtone
+    await CallNotificationService.instance.dismissNotification(call.callId);
+    await PendingCallManager.instance.clearPendingCall();
+
+    if (rejectNotificationCallDelegate != null) {
+      await rejectNotificationCallDelegate!(call);
+      return;
+    }
+
+    // 2. Reject via ZEGOCLOUD signaling if active
+    if (!Get.testMode) {
+      try {
+        ZegoUIKitPrebuiltCallInvitationService().reject();
+      } catch (_) {}
+    }
+
+    // 3. Save or update call record in SQLite call history as 'rejected'
+    final currentUid = _authService.currentUserId ?? '';
+    final currentName = _authService.getCurrentUser()?.displayName ?? 'User';
+
+    await _callHistoryService.saveCallRecord(
+      CallModel(
+        id: call.callId,
+        callerId: call.callerUid,
+        callerName: call.callerName,
+        callerPhoto: call.callerPhoto,
+        calleeId: currentUid,
+        calleeName: currentName,
+        calleePhoto: _authService.getCurrentUser()?.photoURL,
+        callType: call.callType,
+        direction: 'incoming',
+        status: 'rejected',
+        startedAt: call.timestamp,
+        endedAt: DateTime.now(),
+        durationSeconds: 0,
+      ),
+    );
+  }
+
+  void _handleCallEndCleanUp(ZegoCallEndEvent event, VoidCallback defaultAction) async {
+    final endCallId = activeCallId.value.isNotEmpty
+        ? activeCallId.value
+        : (_currentSessionCallId ?? ZegoUIKit().getRoom().id);
+
+    int duration = 0;
+    if (_callConnectedAt != null) {
+      duration = DateTime.now().difference(_callConnectedAt!).inSeconds;
+      if (duration < 0) duration = 0;
+    }
+
+    final isDisconnected = event.reason == ZegoCallEndReason.kickOut ||
+        event.reason == ZegoCallEndReason.abandoned;
+    final endStatus = isDisconnected ? 'disconnected' : 'ended';
+
+    if (endCallId.isNotEmpty) {
+      await _callHistoryService.updateCallStatus(
+        callId: endCallId,
+        status: endStatus,
+        endedAt: DateTime.now(),
+        durationSeconds: duration,
+      );
+    }
+
+    _callConnectedAt = null;
+    _currentSessionCallId = null;
+    isCalling.value = false;
+    activeCallId.value = '';
+
+    try {
+      defaultAction();
+    } catch (_) {}
+
+    try {
+      final nav = navigatorKey.currentState;
+      if (nav != null) {
+        nav.popUntil((route) => route.isFirst);
+      }
+    } catch (_) {}
+
+    if (!Get.isRegistered<HomeController>()) {
+      Get.put(HomeController(), permanent: true);
+    }
+
+    if (Get.currentRoute != AppRoutes.home) {
+      Get.offAllNamed(AppRoutes.home);
+    }
   }
 }
