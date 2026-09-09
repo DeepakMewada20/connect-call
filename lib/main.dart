@@ -9,10 +9,14 @@ import 'routes/app_pages.dart';
 import 'screens/calling/incoming_call_decision_dialog.dart';
 import 'services/call_notification_service.dart';
 import 'services/fcm_service.dart';
+import 'services/theme_service.dart';
 import 'services/zego_call_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize theme mode preference
+  await ThemeService.instance.init();
 
   try {
     await Firebase.initializeApp(
@@ -63,13 +67,17 @@ class ConnectCallApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title: AppConstants.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      navigatorKey: ZegoCallService.navigatorKey,
-      initialRoute: AppPages.initial,
-      getPages: AppPages.pages,
+    return Obx(
+      () => GetMaterialApp(
+        title: AppConstants.appName,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeService.instance.themeMode.value,
+        navigatorKey: ZegoCallService.navigatorKey,
+        initialRoute: AppPages.initial,
+        getPages: AppPages.pages,
+      ),
     );
   }
 }

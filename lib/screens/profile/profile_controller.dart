@@ -4,22 +4,26 @@ import '../../core/theme/app_theme.dart';
 import '../../models/user_model.dart';
 import '../../routes/app_routes.dart';
 import '../../services/auth_service.dart';
+import '../../services/theme_service.dart';
 import '../../services/user_service.dart';
 import '../../services/zego_call_service.dart';
 
 class ProfileController extends GetxController {
   final UserService _userService;
   final AuthService _authService;
+  final ThemeService _themeService;
   final ZegoCallService? zegoCallService;
   final String? currentUserIdOverride;
 
   ProfileController({
     UserService? userService,
     AuthService? authService,
+    ThemeService? themeService,
     this.zegoCallService,
     this.currentUserIdOverride,
   })  : _userService = userService ?? UserService(),
-        _authService = authService ?? AuthService();
+        _authService = authService ?? AuthService(),
+        _themeService = themeService ?? ThemeService.instance;
 
   ZegoCallService get activeCallService =>
       zegoCallService ?? ZegoCallService.instance;
@@ -149,5 +153,183 @@ class ProfileController extends GetxController {
     if (result == true) {
       await loadUserProfile();
     }
+  }
+
+  // --- Theme Management ---
+  Rx<ThemeMode> get themeMode => _themeService.themeMode;
+  String get currentThemeName => _themeService.currentThemeName;
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    await _themeService.setThemeMode(mode);
+  }
+
+  void showThemeSelectionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return Obx(() {
+          final currentMode = _themeService.themeMode.value;
+
+          return AlertDialog(
+            backgroundColor: AppTheme.surfaceColorOf(context),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.palette_outlined,
+                    color: AppTheme.primaryColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Choose Theme',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimaryOf(context),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildThemeOption(
+                  context: dialogContext,
+                  title: 'System Default',
+                  subtitle: 'Follow device system appearance',
+                  icon: Icons.brightness_auto_rounded,
+                  mode: ThemeMode.system,
+                  isSelected: currentMode == ThemeMode.system,
+                ),
+                const SizedBox(height: 10),
+                _buildThemeOption(
+                  context: dialogContext,
+                  title: 'Light Theme',
+                  subtitle: 'Clean, bright Slate appearance',
+                  icon: Icons.light_mode_rounded,
+                  mode: ThemeMode.light,
+                  isSelected: currentMode == ThemeMode.light,
+                ),
+                const SizedBox(height: 10),
+                _buildThemeOption(
+                  context: dialogContext,
+                  title: 'Dark Theme',
+                  subtitle: 'Sleek, eye-friendly dark appearance',
+                  icon: Icons.dark_mode_rounded,
+                  mode: ThemeMode.dark,
+                  isSelected: currentMode == ThemeMode.dark,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text(
+                  'Done',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
+
+  Widget _buildThemeOption({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required ThemeMode mode,
+    required bool isSelected,
+  }) {
+    final activeColor = AppTheme.primaryColor;
+    return InkWell(
+      key: Key('theme_option_${mode.name}'),
+      onTap: () {
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        setThemeMode(mode);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? activeColor
+                : AppTheme.dividerColorOf(context).withValues(alpha: 0.6),
+            width: isSelected ? 2 : 1,
+          ),
+          color: isSelected
+              ? activeColor.withValues(alpha: 0.08)
+              : Colors.transparent,
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? activeColor.withValues(alpha: 0.15)
+                    : AppTheme.dividerColorOf(context).withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? activeColor : AppTheme.textSecondaryOf(context),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      color: isSelected ? activeColor : AppTheme.textPrimaryOf(context),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textSecondaryOf(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(
+                Icons.check_circle_rounded,
+                color: activeColor,
+                size: 20,
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }

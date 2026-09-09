@@ -27,7 +27,7 @@ class HomeScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.backgroundColorOf(context),
       body: Obx(
         () => IndexedStack(
           index: controller.selectedIndex.value,
@@ -38,9 +38,9 @@ class HomeScreen extends StatelessWidget {
         () => NavigationBar(
           selectedIndex: controller.selectedIndex.value,
           onDestinationSelected: controller.changeTab,
-          backgroundColor: Colors.white,
+          backgroundColor: AppTheme.surfaceColorOf(context),
           elevation: 8,
-          indicatorColor: AppTheme.primaryColor.withValues(alpha: 0.12),
+          indicatorColor: AppTheme.primaryColor.withValues(alpha: AppTheme.isDarkMode(context) ? 0.24 : 0.12),
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.home_outlined),
@@ -76,12 +76,12 @@ class HomeScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header: Greeting, User Name, Avatar, and Logout action
-            _buildHeader(),
+            _buildHeader(context),
 
             const SizedBox(height: 28),
 
             // Favorite Contacts / Most Called Section
-            _buildFavoritesOrMostCalledSection(),
+            _buildFavoritesOrMostCalledSection(context),
 
             const SizedBox(height: 28),
 
@@ -89,7 +89,7 @@ class HomeScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSectionTitle('Recent Calls'),
+                _buildSectionTitle('Recent Calls', context),
                 Obx(() {
                   if (controller.recentCalls.isEmpty) {
                     return const SizedBox.shrink();
@@ -110,7 +110,7 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 12),
             Obx(() {
               if (controller.recentCalls.isEmpty) {
-                return _buildRecentCallsEmptyState();
+                return _buildRecentCallsEmptyState(context);
               }
               return _buildRecentCallsList(context);
             }),
@@ -120,7 +120,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Row(
       children: [
         // Greeting & Name
@@ -130,28 +130,28 @@ class HomeScreen extends StatelessWidget {
             children: [
               Text(
                 controller.greeting,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.textSecondary,
+                  color: AppTheme.textSecondaryOf(context),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 controller.userName,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimaryOf(context),
                 ),
               ),
               const SizedBox(height: 2),
-              const Text(
+              Text(
                 'Ready to connect?',
                 style: TextStyle(
                   fontSize: 13,
-                  color: AppTheme.textSecondary,
+                  color: AppTheme.textSecondaryOf(context),
                 ),
               ),
             ],
@@ -181,9 +181,9 @@ class HomeScreen extends StatelessWidget {
             child: Text(
               controller.userInitial,
               style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
                 color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
               ),
             ),
           ),
@@ -201,19 +201,19 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, BuildContext context) {
     return Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
         letterSpacing: -0.3,
-        color: AppTheme.textPrimary,
+        color: AppTheme.textPrimaryOf(context),
       ),
     );
   }
 
-  Widget _buildFavoritesOrMostCalledSection() {
+  Widget _buildFavoritesOrMostCalledSection(BuildContext context) {
     return Obx(() {
       final hasFavorites = controller.favoriteContacts.isNotEmpty;
       final hasMostCalled = controller.mostCalledContacts.isNotEmpty;
@@ -229,7 +229,7 @@ class HomeScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildSectionTitle(title),
+              _buildSectionTitle(title, context),
               if (hasFavorites || hasMostCalled)
                 TextButton(
                   onPressed: () => controller.changeTab(1),
@@ -245,17 +245,17 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (hasFavorites)
-            _buildFavoritesList()
+            _buildFavoritesList(context)
           else if (hasMostCalled)
-            _buildMostCalledList()
+            _buildMostCalledList(context)
           else
-            _buildFavoritesEmptyState(),
+            _buildFavoritesEmptyState(context),
         ],
       );
     });
   }
 
-  Widget _buildFavoritesList() {
+  Widget _buildFavoritesList(BuildContext context) {
     return SizedBox(
       height: 160,
       child: ListView.separated(
@@ -264,23 +264,23 @@ class HomeScreen extends StatelessWidget {
         separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final fav = controller.favoriteContacts[index];
-          return _buildFavoriteContactCard(fav);
+          return _buildFavoriteContactCard(fav, context);
         },
       ),
     );
   }
 
-  Widget _buildFavoriteContactCard(FavoriteContactModel fav) {
+  Widget _buildFavoriteContactCard(FavoriteContactModel fav, BuildContext context) {
     return Container(
       width: 140,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.cardColorOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.dividerColor),
+        border: Border.all(color: AppTheme.dividerColorOf(context)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: AppTheme.isDarkMode(context) ? 0.2 : 0.02),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -324,10 +324,10 @@ class HomeScreen extends StatelessWidget {
             fav.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
+              color: AppTheme.textPrimaryOf(context),
             ),
           ),
           const SizedBox(height: 10),
@@ -366,7 +366,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMostCalledList() {
+  Widget _buildMostCalledList(BuildContext context) {
     return SizedBox(
       height: 160,
       child: ListView.separated(
@@ -376,23 +376,23 @@ class HomeScreen extends StatelessWidget {
         itemBuilder: (context, index) {
           final user = controller.mostCalledContacts[index];
           final callCount = controller.mostCalledCounts[user.uid] ?? 1;
-          return _buildMostCalledContactCard(user, callCount);
+          return _buildMostCalledContactCard(user, callCount, context);
         },
       ),
     );
   }
 
-  Widget _buildMostCalledContactCard(UserModel user, int callCount) {
+  Widget _buildMostCalledContactCard(UserModel user, int callCount, BuildContext context) {
     return Container(
       width: 140,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.cardColorOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.dividerColor),
+        border: Border.all(color: AppTheme.dividerColorOf(context)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: AppTheme.isDarkMode(context) ? 0.2 : 0.02),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -403,15 +403,15 @@ class HomeScreen extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: Colors.blue.shade50,
+            backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
             backgroundImage: user.profileImage.isNotEmpty
                 ? NetworkImage(user.profileImage)
                 : null,
             child: user.profileImage.isEmpty
                 ? Text(
                     user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
+                    style: const TextStyle(
+                      color: AppTheme.primaryColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
@@ -423,18 +423,18 @@ class HomeScreen extends StatelessWidget {
             user.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
+              color: AppTheme.textPrimaryOf(context),
             ),
           ),
           const SizedBox(height: 2),
           Text(
             '$callCount call${callCount > 1 ? 's' : ''}',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
-              color: AppTheme.textSecondary,
+              color: AppTheme.textSecondaryOf(context),
             ),
           ),
           const SizedBox(height: 8),
@@ -473,14 +473,14 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFavoritesEmptyState() {
+  Widget _buildFavoritesEmptyState(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.cardColorOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.dividerColor),
+        border: Border.all(color: AppTheme.dividerColorOf(context)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -499,21 +499,21 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'No Favorite Contacts',
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: AppTheme.textPrimary,
+              color: AppTheme.textPrimaryOf(context),
             ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Star contacts in the Contacts tab for one-tap calling.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
-              color: AppTheme.textSecondary,
+              color: AppTheme.textSecondaryOf(context),
             ),
           ),
           const SizedBox(height: 12),
@@ -531,14 +531,14 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentCallsEmptyState() {
+  Widget _buildRecentCallsEmptyState(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.cardColorOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.dividerColor),
+        border: Border.all(color: AppTheme.dividerColorOf(context)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -547,31 +547,33 @@ class HomeScreen extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: Colors.grey.shade100,
+              color: AppTheme.isDarkMode(context)
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.grey.shade100,
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.phone_missed_rounded,
               size: 28,
-              color: Colors.grey.shade400,
+              color: AppTheme.textSecondaryOf(context),
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'No recent calls',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: AppTheme.textPrimary,
+              color: AppTheme.textPrimaryOf(context),
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Your recent calls will appear here once you start connecting.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
-              color: AppTheme.textSecondary,
+              color: AppTheme.textSecondaryOf(context),
               height: 1.4,
             ),
           ),
@@ -583,9 +585,9 @@ class HomeScreen extends StatelessWidget {
   Widget _buildRecentCallsList(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.cardColorOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.dividerColor),
+        border: Border.all(color: AppTheme.dividerColorOf(context)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -593,11 +595,11 @@ class HomeScreen extends StatelessWidget {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: controller.recentCalls.length,
-          separatorBuilder: (context, index) => const Divider(
+          separatorBuilder: (context, index) => Divider(
             height: 1,
             indent: 72,
             endIndent: 16,
-            color: AppTheme.dividerColor,
+            color: AppTheme.dividerColorOf(context),
           ),
           itemBuilder: (context, index) {
             final call = controller.recentCalls[index];

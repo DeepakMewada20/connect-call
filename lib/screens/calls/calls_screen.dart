@@ -14,7 +14,7 @@ class CallsScreen extends StatelessWidget {
     final controller = Get.put(CallsController());
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.backgroundColorOf(context),
       appBar: AppBar(
         title: const Text('Call History'),
         automaticallyImplyLeading: false,
@@ -46,7 +46,7 @@ class CallsScreen extends StatelessWidget {
           }
 
           // 2. Error state
-          if (controller.hasError.value && controller.callHistory.isEmpty) {
+          if (controller.errorMessage.isNotEmpty && controller.callHistory.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -57,13 +57,14 @@ class CallsScreen extends StatelessWidget {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
+                        color: Colors.red.shade50.withValues(
+                            alpha: AppTheme.isDarkMode(context) ? 0.15 : 1.0),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.error_outline_rounded,
                         size: 32,
-                        color: Colors.red.shade600,
+                        color: Colors.red.shade400,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -72,19 +73,19 @@ class CallsScreen extends StatelessWidget {
                           ? controller.errorMessage.value
                           : 'Unable to load call history.',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
+                        color: AppTheme.textPrimaryOf(context),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'Please check your connection and try again.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
-                        color: AppTheme.textSecondary,
+                        color: AppTheme.textSecondaryOf(context),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -136,21 +137,21 @@ class CallsScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            const Text(
+                            Text(
                               'No calls yet',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
+                                color: AppTheme.textPrimaryOf(context),
                               ),
                             ),
                             const SizedBox(height: 8),
-                            const Text(
+                            Text(
                               'Your recent audio and video calls will appear here.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 14,
-                                color: AppTheme.textSecondary,
+                                color: AppTheme.textSecondaryOf(context),
                                 height: 1.4,
                               ),
                             ),

@@ -17,7 +17,7 @@ class ContactsScreen extends StatelessWidget {
         : Get.put(ContactsController());
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.backgroundColorOf(context),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -26,7 +26,7 @@ class ContactsScreen extends StatelessWidget {
             _buildHeader(context, controller),
 
             // Search Bar
-            _buildSearchBar(controller),
+            _buildSearchBar(controller, context),
 
             const SizedBox(height: 8),
 
@@ -102,7 +102,7 @@ class ContactsScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Column(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
@@ -111,16 +111,16 @@ class ContactsScreen extends StatelessWidget {
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimaryOf(context),
                 ),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 'Connect with people',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
-                  color: AppTheme.textSecondary,
+                  color: AppTheme.textSecondaryOf(context),
                 ),
               ),
             ],
@@ -140,17 +140,17 @@ class ContactsScreen extends StatelessWidget {
   }
 
   // Search input with real-time reactive filtering and clear action
-  Widget _buildSearchBar(ContactsController controller) {
+  Widget _buildSearchBar(ContactsController controller, BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppTheme.cardColorOf(context),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppTheme.dividerColor),
+          border: Border.all(color: AppTheme.dividerColorOf(context)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
+              color: Colors.black.withValues(alpha: AppTheme.isDarkMode(context) ? 0.2 : 0.02),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -160,15 +160,19 @@ class ContactsScreen extends StatelessWidget {
           controller: controller.searchController,
           onChanged: controller.onSearchChanged,
           textInputAction: TextInputAction.search,
+          style: TextStyle(
+            color: AppTheme.textPrimaryOf(context),
+            fontSize: 14,
+          ),
           decoration: InputDecoration(
             hintText: 'Search contacts or phone number',
-            hintStyle: const TextStyle(
-              color: AppTheme.textSecondary,
+            hintStyle: TextStyle(
+              color: AppTheme.textSecondaryOf(context),
               fontSize: 14,
             ),
-            prefixIcon: const Icon(
+            prefixIcon: Icon(
               Icons.search_rounded,
-              color: AppTheme.textSecondary,
+              color: AppTheme.textSecondaryOf(context),
               size: 22,
             ),
             suffixIcon: Obx(() {
@@ -176,10 +180,10 @@ class ContactsScreen extends StatelessWidget {
                 return const SizedBox.shrink();
               }
               return IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.close_rounded,
                   size: 18,
-                  color: AppTheme.textSecondary,
+                  color: AppTheme.textSecondaryOf(context),
                 ),
                 onPressed: controller.clearSearch,
               );

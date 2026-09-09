@@ -35,7 +35,7 @@ class CallHistoryTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppTheme.dividerColor.withValues(alpha: 0.6)),
+            border: Border.all(color: AppTheme.dividerColorOf(context).withValues(alpha: 0.6)),
           ),
           child: Row(
             children: [
@@ -58,8 +58,8 @@ class CallHistoryTile extends StatelessWidget {
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: call.isMissed
-                            ? Colors.red.shade700
-                            : AppTheme.textPrimary,
+                            ? Colors.red.shade400
+                            : AppTheme.textPrimaryOf(context),
                         letterSpacing: -0.2,
                       ),
                     ),
@@ -84,9 +84,9 @@ class CallHistoryTile extends StatelessWidget {
                             call.formattedDate,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppTheme.textSecondary,
+                              color: AppTheme.textSecondaryOf(context),
                             ),
                           ),
                         ),

@@ -35,12 +35,12 @@ class UserTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.cardColorOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.dividerColor),
+        border: Border.all(color: AppTheme.dividerColorOf(context)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: AppTheme.isDarkMode(context) ? 0.2 : 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -51,7 +51,7 @@ class UserTile extends StatelessWidget {
         child: Row(
           children: [
             // User Avatar with Online Indicator
-            _buildAvatarWithStatus(),
+            _buildAvatarWithStatus(context),
             const SizedBox(width: 14),
 
             // User Name and Status / Phone Number
@@ -67,10 +67,10 @@ class UserTile extends StatelessWidget {
                           user.name.isNotEmpty ? user.name : 'Unknown User',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
+                            color: AppTheme.textPrimaryOf(context),
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -142,7 +142,7 @@ class UserTile extends StatelessWidget {
                           fontWeight: FontWeight.w500,
                           color: user.isOnline
                               ? const Color(0xFF10B981)
-                              : AppTheme.textSecondary,
+                              : AppTheme.textSecondaryOf(context),
                         ),
                       ),
                       if (user.phoneNumber.isNotEmpty) ...[
@@ -151,7 +151,7 @@ class UserTile extends StatelessWidget {
                           '•',
                           style: TextStyle(
                             fontSize: 10,
-                            color: Colors.grey.shade400,
+                            color: AppTheme.dividerColorOf(context),
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -160,9 +160,9 @@ class UserTile extends StatelessWidget {
                             user.phoneNumber,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppTheme.textSecondary,
+                              color: AppTheme.textSecondaryOf(context),
                             ),
                           ),
                         ),
@@ -343,7 +343,7 @@ class UserTile extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatarWithStatus() {
+  Widget _buildAvatarWithStatus(BuildContext context) {
     final String initial =
         user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U';
     final bool hasImage = user.profileImage.trim().isNotEmpty;
@@ -379,8 +379,8 @@ class UserTile extends StatelessWidget {
                   ? const Color(0xFF10B981)
                   : Colors.grey.shade400,
               border: Border.all(
-                color: Colors.white,
-                width: 2.2,
+                color: AppTheme.cardColorOf(context),
+                width: 2,
               ),
             ),
           ),

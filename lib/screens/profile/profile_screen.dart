@@ -16,7 +16,7 @@ class ProfileScreen extends StatelessWidget {
             : Get.put(ProfileController());
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppTheme.backgroundColorOf(context),
       appBar: AppBar(
         title: const Text('Profile'),
         centerTitle: true,
@@ -26,19 +26,19 @@ class ProfileScreen extends StatelessWidget {
       body: SafeArea(
         child: Obx(() {
           if (controller.isLoading.value && controller.user.value == null) {
-            return _buildLoadingState();
+            return _buildLoadingState(context);
           }
 
           if (controller.errorMessage.isNotEmpty &&
               controller.user.value == null) {
-            return _buildErrorState(controller);
+            return _buildErrorState(controller, context);
           }
 
           final currentUser = controller.user.value;
 
           return RefreshIndicator(
             color: AppTheme.primaryColor,
-            backgroundColor: Colors.white,
+            backgroundColor: AppTheme.surfaceColorOf(context),
             onRefresh: controller.loadUserProfile,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -47,7 +47,7 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 children: [
                   // Profile Header Card: Avatar, Name, Phone Number, Status
-                  _buildProfileHeader(controller, currentUser),
+                  _buildProfileHeader(controller, currentUser, context),
 
                   const SizedBox(height: 20),
 
@@ -57,12 +57,12 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 28),
 
                   // Account Information Section
-                  _buildAccountSection(currentUser),
+                  _buildAccountSection(currentUser, context),
 
                   const SizedBox(height: 20),
 
                   // Settings & Logout Section
-                  _buildSettingsSection(controller),
+                  _buildSettingsSection(controller, context),
 
                   const SizedBox(height: 24),
                 ],
@@ -76,7 +76,7 @@ class ProfileScreen extends StatelessWidget {
 
   // Profile Header with Avatar, Name, Phone Number, and Online/Offline Badge
   Widget _buildProfileHeader(
-      ProfileController controller, dynamic currentUser) {
+      ProfileController controller, dynamic currentUser, BuildContext context) {
     final String displayName =
         currentUser?.name.isNotEmpty == true ? currentUser!.name : 'User';
     final String contactInfo = currentUser?.phoneNumber ?? '';
@@ -90,12 +90,12 @@ class ProfileScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.cardColorOf(context),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.dividerColor),
+        border: Border.all(color: AppTheme.dividerColorOf(context)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: AppTheme.isDarkMode(context) ? 0.2 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -136,7 +136,10 @@ class ProfileScreen extends StatelessWidget {
                     color: isOnline
                         ? const Color(0xFF10B981)
                         : Colors.grey.shade400,
-                    border: Border.all(color: Colors.white, width: 2.5),
+                    border: Border.all(
+                      color: AppTheme.cardColorOf(context),
+                      width: 2.5,
+                    ),
                   ),
                 ),
               ),
@@ -149,11 +152,11 @@ class ProfileScreen extends StatelessWidget {
           Text(
             displayName,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               letterSpacing: -0.3,
-              color: AppTheme.textPrimary,
+              color: AppTheme.textPrimaryOf(context),
             ),
           ),
 
@@ -164,9 +167,9 @@ class ProfileScreen extends StatelessWidget {
             Text(
               contactInfo,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppTheme.textSecondary,
+                color: AppTheme.textSecondaryOf(context),
               ),
             ),
             const SizedBox(height: 12),
@@ -179,7 +182,9 @@ class ProfileScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: isOnline
                   ? const Color(0xFF10B981).withValues(alpha: 0.1)
-                  : Colors.grey.shade100,
+                  : (AppTheme.isDarkMode(context)
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.grey.shade100),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -203,7 +208,9 @@ class ProfileScreen extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: isOnline
                         ? const Color(0xFF10B981)
-                        : Colors.grey.shade600,
+                        : (AppTheme.isDarkMode(context)
+                            ? AppTheme.darkTextSecondary
+                            : Colors.grey.shade600),
                   ),
                 ),
               ],
@@ -236,31 +243,32 @@ class ProfileScreen extends StatelessWidget {
   }
 
   // Account Information Section
-  Widget _buildAccountSection(dynamic currentUser) {
+  Widget _buildAccountSection(dynamic currentUser, BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppTheme.cardColorOf(context),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppTheme.dividerColor),
+          border: Border.all(color: AppTheme.dividerColorOf(context)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(18, 16, 18, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
               child: Text(
                 'Account',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.textSecondary,
+                  color: AppTheme.textSecondaryOf(context),
                   letterSpacing: 0.5,
                 ),
               ),
             ),
             _buildInfoTile(
+              context: context,
               icon: Icons.shield_outlined,
               title: 'Account Status',
               subtitle: 'Verified & Active',
@@ -272,82 +280,171 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Settings Section: App info and Logout
-  Widget _buildSettingsSection(ProfileController controller) {
+  // Settings Section: Theme toggle, App info and Logout
+  Widget _buildSettingsSection(ProfileController controller, BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppTheme.cardColorOf(context),
       borderRadius: BorderRadius.circular(18),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppTheme.dividerColor),
+          border: Border.all(color: AppTheme.dividerColorOf(context)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(18, 16, 18, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
               child: Text(
                 'Settings',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.textSecondary,
+                  color: AppTheme.textSecondaryOf(context),
                   letterSpacing: 0.5,
                 ),
               ),
             ),
-          _buildInfoTile(
-            icon: Icons.info_outline_rounded,
-            title: AppConstants.appName,
-            subtitle: 'Version 1.0.0',
-          ),
-          const Divider(height: 1, indent: 56, color: AppTheme.dividerColor),
-          // Logout Tile
-          ListTile(
-            onTap: controller.isLoggingOut.value
-                ? null
-                : controller.showLogoutConfirmation,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
-            leading: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(10),
+
+            // Theme Settings Tile
+            Obx(() {
+              final themeName = controller.currentThemeName;
+              final IconData themeIcon;
+              switch (controller.themeMode.value) {
+                case ThemeMode.light:
+                  themeIcon = Icons.light_mode_rounded;
+                  break;
+                case ThemeMode.dark:
+                  themeIcon = Icons.dark_mode_rounded;
+                  break;
+                case ThemeMode.system:
+                  themeIcon = Icons.brightness_auto_rounded;
+                  break;
+              }
+
+              return ListTile(
+                key: const Key('profile_theme_tile'),
+                onTap: () => controller.showThemeSelectionDialog(context),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                leading: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    themeIcon,
+                    color: AppTheme.primaryColor,
+                    size: 20,
+                  ),
+                ),
+                title: Text(
+                  'Theme',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimaryOf(context),
+                  ),
+                ),
+                subtitle: Text(
+                  themeName,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondaryOf(context),
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        themeName,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppTheme.textSecondaryOf(context),
+                      size: 20,
+                    ),
+                  ],
+                ),
+              );
+            }),
+
+            Divider(height: 1, indent: 56, color: AppTheme.dividerColorOf(context)),
+
+            // App Version Tile
+            _buildInfoTile(
+              context: context,
+              icon: Icons.info_outline_rounded,
+              title: AppConstants.appName,
+              subtitle: 'Version 1.0.0',
+            ),
+
+            Divider(height: 1, indent: 56, color: AppTheme.dividerColorOf(context)),
+
+            // Logout Tile
+            ListTile(
+              onTap: controller.isLoggingOut.value
+                  ? null
+                  : controller.showLogoutConfirmation,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+              leading: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50.withValues(
+                      alpha: AppTheme.isDarkMode(context) ? 0.15 : 1.0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.logout_rounded,
+                  color: Colors.red.shade400,
+                  size: 20,
+                ),
               ),
-              child: Icon(
-                Icons.logout_rounded,
-                color: Colors.red.shade600,
+              title: Text(
+                'Logout',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.red.shade400,
+                ),
+              ),
+              subtitle: Text(
+                'Sign out from your account',
+                style: TextStyle(
+                    fontSize: 12, color: AppTheme.textSecondaryOf(context)),
+              ),
+              trailing: Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.textSecondaryOf(context),
                 size: 20,
               ),
             ),
-            title: Text(
-              'Logout',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.red.shade600,
-              ),
-            ),
-            subtitle: const Text(
-              'Sign out from your account',
-              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-            ),
-            trailing: const Icon(
-              Icons.chevron_right_rounded,
-              color: AppTheme.textSecondary,
-              size: 20,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildInfoTile({
+    required BuildContext context,
     required IconData icon,
     required String title,
     required String subtitle,
@@ -367,10 +464,10 @@ class ProfileScreen extends StatelessWidget {
       ),
       title: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w600,
-          color: AppTheme.textPrimary,
+          color: AppTheme.textPrimaryOf(context),
         ),
       ),
       subtitle: Text(
@@ -379,29 +476,32 @@ class ProfileScreen extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 12,
-          color: trailingColor ?? AppTheme.textSecondary,
+          color: trailingColor ?? AppTheme.textSecondaryOf(context),
         ),
       ),
     );
   }
 
-  Widget _buildLoadingState() {
-    return const Center(
+  Widget _buildLoadingState(BuildContext context) {
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(color: AppTheme.primaryColor),
-          SizedBox(height: 16),
+          const CircularProgressIndicator(color: AppTheme.primaryColor),
+          const SizedBox(height: 16),
           Text(
             'Loading profile...',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+            style: TextStyle(
+              color: AppTheme.textSecondaryOf(context),
+              fontSize: 14,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState(ProfileController controller) {
+  Widget _buildErrorState(ProfileController controller, BuildContext context) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -414,21 +514,21 @@ class ProfileScreen extends StatelessWidget {
               color: Colors.red.shade400,
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Unable to load profile',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
+                color: AppTheme.textPrimaryOf(context),
               ),
             ),
             const SizedBox(height: 8),
             Text(
               controller.errorMessage.value,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: AppTheme.textSecondary,
+                color: AppTheme.textSecondaryOf(context),
               ),
             ),
             const SizedBox(height: 20),
