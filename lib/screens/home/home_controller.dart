@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/call_model.dart';
+import '../../models/favorite_contact_model.dart';
 import '../../models/user_model.dart';
 import '../../routes/app_routes.dart';
 import '../../services/auth_service.dart';
+import '../../services/block_service.dart';
 import '../../services/call_history_service.dart';
+import '../../services/favorite_service.dart';
 import '../../services/user_service.dart';
 import '../../services/zego_call_service.dart';
 import '../calls/calls_controller.dart';
@@ -16,16 +19,22 @@ class HomeController extends GetxController {
   final AuthService _authService;
   final UserService _userService;
   final CallHistoryService _callHistoryService;
+  final BlockService _blockService;
+  final FavoriteService _favoriteService;
   final ZegoCallService? zegoCallService;
 
   HomeController({
     AuthService? authService,
     UserService? userService,
     CallHistoryService? callHistoryService,
+    BlockService? blockService,
+    FavoriteService? favoriteService,
     this.zegoCallService,
   })  : _authService = authService ?? AuthService(),
         _userService = userService ?? UserService(),
-        _callHistoryService = callHistoryService ?? CallHistoryService.instance;
+        _callHistoryService = callHistoryService ?? CallHistoryService.instance,
+        _blockService = blockService ?? BlockService.instance,
+        _favoriteService = favoriteService ?? FavoriteService.instance;
 
   ZegoCallService get activeCallService =>
       zegoCallService ?? ZegoCallService.instance;
@@ -34,7 +43,24 @@ class HomeController extends GetxController {
   final RxList<CallModel> recentCalls = <CallModel>[].obs;
   StreamSubscription<List<CallModel>>? _recentCallsSubscription;
 
+  // Phase 5 Observables
+  final RxList<FavoriteContactModel> favoriteContacts = <FavoriteContactModel>[].obs;
+  final RxList<UserModel> mostCalledContacts = <UserModel>[].obs;
+  final RxMap<String, int> mostCalledCounts = <String, int>{}.obs;
+  final RxBool isLoadingHomeContacts = false.obs;
+
+  StreamSubscription<List<FavoriteContactModel>>? _favoritesSubscription;
+  StreamSubscription<Set<String>>? _blockedSubscription;
+
   String? get currentUid => _authService.currentUserId;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _blockService.initBlockedUsersListener();
+    _favoriteService.initFavoritesListener();
+    _subscribeToFavoritesAndBlocks();
+  }
 
   @override
   void onReady() {
@@ -45,12 +71,105 @@ class HomeController extends GetxController {
       _ensureUserDocumentExists();
       _subscribeToRecentCalls();
     }
+    loadHomeContacts();
   }
 
   @override
   void onClose() {
     _recentCallsSubscription?.cancel();
+    _favoritesSubscription?.cancel();
+    _blockedSubscription?.cancel();
     super.onClose();
+  }
+
+  void _subscribeToFavoritesAndBlocks() {
+    _favoritesSubscription = _favoriteService.favorites.listen((favs) {
+      final nonBlocked = favs.where((f) => !_blockService.isBlockedSync(f.userId)).toList();
+      favoriteContacts.assignAll(nonBlocked);
+      if (favoriteContacts.isEmpty) {
+        _computeMostCalled();
+      } else {
+        mostCalledContacts.clear();
+        mostCalledCounts.clear();
+      }
+    });
+    _blockedSubscription = _blockService.blockedUserIds.listen((_) {
+      final nonBlocked = _favoriteService.favorites.where((f) => !_blockService.isBlockedSync(f.userId)).toList();
+      favoriteContacts.assignAll(nonBlocked);
+      if (favoriteContacts.isEmpty) {
+        _computeMostCalled();
+      } else {
+        mostCalledContacts.clear();
+        mostCalledCounts.clear();
+      }
+    });
+  }
+
+  Future<void> loadHomeContacts() async {
+    isLoadingHomeContacts.value = true;
+    try {
+      // 1. Fetch favorite contacts
+      final allFavs = await _favoriteService.getFavorites();
+      final nonBlockedFavs = allFavs.where((f) => !_blockService.isBlockedSync(f.userId)).toList();
+      favoriteContacts.assignAll(nonBlockedFavs);
+
+      // 2. If no favorites, calculate most frequently called from SQLite Call History
+      if (favoriteContacts.isEmpty) {
+        await _computeMostCalled();
+      } else {
+        mostCalledContacts.clear();
+        mostCalledCounts.clear();
+      }
+    } catch (e) {
+      debugPrint('HomeController.loadHomeContacts error: $e');
+    } finally {
+      isLoadingHomeContacts.value = false;
+    }
+  }
+
+  Future<void> _computeMostCalled() async {
+    try {
+      final history = await _callHistoryService.getCallHistory(limit: 100);
+      final myUid = currentUid ?? '';
+
+      final Map<String, int> counts = {};
+      final Map<String, CallModel> latestCallsByUser = {};
+
+      for (final call in history) {
+        final otherUid = call.getOtherUserId(myUid);
+        if (otherUid.isEmpty || otherUid == myUid) continue;
+        if (_blockService.isBlockedSync(otherUid)) continue;
+
+        counts[otherUid] = (counts[otherUid] ?? 0) + 1;
+        latestCallsByUser.putIfAbsent(otherUid, () => call);
+      }
+
+      // Sort by call count descending
+      final sortedUids = counts.keys.toList()
+        ..sort((a, b) => (counts[b] ?? 0).compareTo(counts[a] ?? 0));
+
+      final topUids = sortedUids.take(5).toList();
+      final List<UserModel> topUsers = [];
+      mostCalledCounts.clear();
+
+      for (final uid in topUids) {
+        mostCalledCounts[uid] = counts[uid] ?? 1;
+        final call = latestCallsByUser[uid]!;
+        final otherName = call.getOtherUserName(myUid);
+        final otherPhoto = call.getOtherUserPhoto(myUid) ?? '';
+        topUsers.add(UserModel(
+          uid: uid,
+          name: otherName,
+          phoneNumber: '',
+          profileImage: otherPhoto,
+          createdAt: DateTime.now(),
+        ));
+      }
+
+      mostCalledContacts.assignAll(topUsers);
+    } catch (e) {
+      debugPrint('HomeController._computeMostCalled error: $e');
+    }
   }
 
   void _subscribeToRecentCalls() {
@@ -58,6 +177,9 @@ class HomeController extends GetxController {
     _recentCallsSubscription =
         _callHistoryService.getRecentCalls(limit: 5).listen((calls) {
       recentCalls.assignAll(calls);
+      if (favoriteContacts.isEmpty) {
+        _computeMostCalled();
+      }
     });
   }
 
@@ -158,6 +280,11 @@ class HomeController extends GetxController {
 
     if (otherUid.isEmpty) return;
 
+    if (_blockService.isBlockedSync(otherUid)) {
+      Get.snackbar('Blocked User', 'Cannot place a call to a blocked user.');
+      return;
+    }
+
     UserModel targetUser;
     final freshUser = await _userService.getUser(otherUid);
     if (freshUser != null) {
@@ -176,6 +303,54 @@ class HomeController extends GetxController {
     } else {
       await activeCallService.sendAudioCallInvitation(targetUser: targetUser);
     }
+  }
+
+  // --- Phase 5: Favorite & Most Called Call Actions ---
+
+  Future<void> onFavoriteAudioCall(FavoriteContactModel fav) async {
+    if (_blockService.isBlockedSync(fav.userId)) {
+      Get.snackbar('Blocked User', 'Cannot place a call to a blocked user.');
+      return;
+    }
+    final targetUser = UserModel(
+      uid: fav.userId,
+      name: fav.name,
+      phoneNumber: fav.phoneNumber,
+      profileImage: fav.avatarUrl,
+      createdAt: DateTime.now(),
+    );
+    await activeCallService.sendAudioCallInvitation(targetUser: targetUser);
+  }
+
+  Future<void> onFavoriteVideoCall(FavoriteContactModel fav) async {
+    if (_blockService.isBlockedSync(fav.userId)) {
+      Get.snackbar('Blocked User', 'Cannot place a call to a blocked user.');
+      return;
+    }
+    final targetUser = UserModel(
+      uid: fav.userId,
+      name: fav.name,
+      phoneNumber: fav.phoneNumber,
+      profileImage: fav.avatarUrl,
+      createdAt: DateTime.now(),
+    );
+    await activeCallService.sendVideoCallInvitation(targetUser: targetUser);
+  }
+
+  Future<void> onMostCalledAudioCall(UserModel user) async {
+    if (_blockService.isBlockedSync(user.uid)) {
+      Get.snackbar('Blocked User', 'Cannot place a call to a blocked user.');
+      return;
+    }
+    await activeCallService.sendAudioCallInvitation(targetUser: user);
+  }
+
+  Future<void> onMostCalledVideoCall(UserModel user) async {
+    if (_blockService.isBlockedSync(user.uid)) {
+      Get.snackbar('Blocked User', 'Cannot place a call to a blocked user.');
+      return;
+    }
+    await activeCallService.sendVideoCallInvitation(targetUser: user);
   }
 
   Future<void> logout() async {

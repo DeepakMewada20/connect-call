@@ -27,6 +27,12 @@ service cloud.firestore {
       match /call_history/{callId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Blocked Users Subcollection:
+      // Each authenticated user can only read and manage their own blocked users list.
+      match /blockedUsers/{blockedUserId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // Calls Collection (prepared for calling functionality in future phases):

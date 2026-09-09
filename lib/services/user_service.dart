@@ -126,6 +126,55 @@ class UserService {
     }
   }
 
+  /// Searches for a registered user by phone number using an exact match.
+  /// Queries both `phoneNumber` and `normalizedPhoneNumber` with `.limit(1)`.
+  Future<UserModel?> getUserByPhoneNumber(String phoneNumber) async {
+    final normalized = PhoneNumberUtil.normalize(phoneNumber) ?? phoneNumber.trim();
+    if (normalized.isEmpty) return null;
+
+    try {
+      // 1. Try matching by canonical normalized phone number
+      var snap = await _usersCollection
+          .where('phoneNumber', isEqualTo: normalized)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isNotEmpty) {
+        final doc = snap.docs.first;
+        return UserModel.fromMap(doc.data(), documentId: doc.id);
+      }
+
+      // 2. Try matching by normalizedPhoneNumber field
+      snap = await _usersCollection
+          .where('normalizedPhoneNumber', isEqualTo: normalized)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isNotEmpty) {
+        final doc = snap.docs.first;
+        return UserModel.fromMap(doc.data(), documentId: doc.id);
+      }
+
+      // 3. Try matching raw trimmed input if different
+      final trimmed = phoneNumber.trim();
+      if (trimmed != normalized) {
+        snap = await _usersCollection
+            .where('phoneNumber', isEqualTo: trimmed)
+            .limit(1)
+            .get();
+        if (snap.docs.isNotEmpty) {
+          final doc = snap.docs.first;
+          return UserModel.fromMap(doc.data(), documentId: doc.id);
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('UserService.getUserByPhoneNumber error: $e');
+      throw mapFirestoreError(e);
+    }
+  }
+
   // Retrieve all user documents from the users collection
   Future<List<UserModel>> getUsers() async {
     try {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/user_model.dart';
+import '../../services/contact_service.dart';
 import '../../widgets/user_tile.dart';
 import 'contacts_controller.dart';
 
@@ -21,7 +23,7 @@ class ContactsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header Section
-            _buildHeader(),
+            _buildHeader(context, controller),
 
             // Search Bar
             _buildSearchBar(controller),
@@ -52,7 +54,32 @@ class ContactsScreen extends StatelessWidget {
                   return _buildErrorState(controller);
                 }
 
-                // 5. Empty State vs Populated List
+                // 5. Smart Search States
+                // 5a. Remote Search In Progress
+                if (controller.isSearchingRemote.value) {
+                  return _buildRemoteSearchingState();
+                }
+
+                // 5b. Remote Search Error
+                if (controller.remoteSearchError.isNotEmpty) {
+                  return _buildRemoteSearchErrorState(controller);
+                }
+
+                // 5c. Remote Searched User Found
+                if (controller.remoteSearchedUser.value != null) {
+                  return _buildRemoteUserResult(
+                    context,
+                    controller,
+                    controller.remoteSearchedUser.value!,
+                  );
+                }
+
+                // 5d. Remote Search Not Found
+                if (controller.remoteSearchNotFound.value) {
+                  return _buildRemoteNotFoundState(controller);
+                }
+
+                // 6. Local Filtered Contacts / Standard Empty State
                 final usersList = controller.filteredUsers;
                 if (usersList.isEmpty) {
                   return _buildEmptyState(controller);
@@ -67,29 +94,44 @@ class ContactsScreen extends StatelessWidget {
     );
   }
 
-  // Header displaying title and subtitle
-  Widget _buildHeader() {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  // Header displaying title, subtitle and Add Contact action
+  Widget _buildHeader(BuildContext context, ContactsController controller) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 16, 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            'Contacts',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              letterSpacing: -0.5,
-              color: AppTheme.textPrimary,
-            ),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Contacts',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Connect with people',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 4),
-          Text(
-            'Connect with people',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: AppTheme.textSecondary,
+          IconButton.filledTonal(
+            onPressed: () => _showAddContactDialog(context, controller),
+            icon: const Icon(Icons.person_add_alt_1_rounded),
+            tooltip: 'Add Contact',
+            style: IconButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+              foregroundColor: AppTheme.primaryColor,
             ),
           ),
         ],
@@ -119,7 +161,7 @@ class ContactsScreen extends StatelessWidget {
           onChanged: controller.onSearchChanged,
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
-            hintText: 'Search contacts...',
+            hintText: 'Search contacts or phone number',
             hintStyle: const TextStyle(
               color: AppTheme.textSecondary,
               fontSize: 14,
@@ -464,13 +506,490 @@ class ContactsScreen extends StatelessWidget {
         itemCount: usersList.length,
         itemBuilder: (context, index) {
           final user = usersList[index];
+          final isFav = controller.isFavorite(user.uid);
+          final isBlk = controller.isBlocked(user.uid);
+          final deviceContact = controller.findDeviceContactForUser(user);
+
           return UserTile(
             user: user,
+            isFavorite: isFav,
+            isBlocked: isBlk,
             onAudioCall: () => controller.onAudioCallTap(user),
             onVideoCall: () => controller.onVideoCallTap(user),
+            onToggleFavorite: () => controller.toggleFavorite(user),
+            onToggleBlock: () => _handleBlockToggle(context, controller, user, isBlk),
+            onEditContact: deviceContact != null
+                ? () => _showEditContactDialog(context, controller, deviceContact)
+                : null,
+            onDeleteContact: deviceContact != null
+                ? () => _showDeleteContactDialog(context, controller, deviceContact)
+                : null,
           );
         },
       ),
     );
+  }
+
+  // Smart Search: In-flight remote lookup loading indicator
+  Widget _buildRemoteSearchingState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            color: AppTheme.primaryColor,
+            strokeWidth: 3,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Checking registered users...',
+            style: TextStyle(
+              fontSize: 15,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Looking up phone number on ConnectCall',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Smart Search: Remote lookup network or service error
+  Widget _buildRemoteSearchErrorState(ContactsController controller) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.wifi_off_rounded,
+                size: 34,
+                color: Colors.red.shade400,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Search Error',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              controller.remoteSearchError.value,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: controller.retryRemoteSearch,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Retry Search'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Smart Search: Number not registered empty state
+  Widget _buildRemoteNotFoundState(ContactsController controller) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.person_off_rounded,
+                size: 36,
+                color: Colors.orange.shade600,
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'No registered user found',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'This number is not registered in the app.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextButton.icon(
+              onPressed: controller.clearSearch,
+              icon: const Icon(Icons.clear_all_rounded, size: 18),
+              label: const Text('Clear search'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.primaryColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Smart Search: Registered user result display
+  Widget _buildRemoteUserResult(BuildContext context, ContactsController controller, UserModel user) {
+    final isFav = controller.isFavorite(user.uid);
+    final isBlk = controller.isBlocked(user.uid);
+    final deviceContact = controller.findDeviceContactForUser(user);
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(top: 8, bottom: 20),
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Text(
+            'Registered User',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+        UserTile(
+          user: user,
+          isSelf: controller.isSelfNumberSearched.value,
+          badgeText: controller.isSelfNumberSearched.value ? null : 'Registered User',
+          isFavorite: isFav,
+          isBlocked: isBlk,
+          onAudioCall: () => controller.onAudioCallTap(user),
+          onVideoCall: () => controller.onVideoCallTap(user),
+          onToggleFavorite: () => controller.toggleFavorite(user),
+          onToggleBlock: () => _handleBlockToggle(context, controller, user, isBlk),
+          onEditContact: deviceContact != null
+              ? () => _showEditContactDialog(context, controller, deviceContact)
+              : null,
+          onDeleteContact: deviceContact != null
+              ? () => _showDeleteContactDialog(context, controller, deviceContact)
+              : null,
+        ),
+      ],
+    );
+  }
+
+  // --- Dialogs for Contact & Block Management ---
+
+  void _showAddContactDialog(BuildContext context, ContactsController controller) {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Add Contact', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                hintText: 'Enter contact name',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Phone Number',
+                hintText: 'e.g. +91 9876543210',
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final phone = phoneController.text.trim();
+              if (name.isEmpty || phone.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter both name and phone number')),
+                );
+                return;
+              }
+              Navigator.of(dialogCtx).pop();
+              final success = await controller.addContact(name: name, phoneNumber: phone);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success ? 'Contact saved to phone contacts.' : 'Failed to save contact.',
+                    ),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditContactDialog(
+    BuildContext context,
+    ContactsController controller,
+    DeviceContact contact,
+  ) {
+    final nameController = TextEditingController(text: contact.name);
+    final initialPhone = contact.phones.isNotEmpty ? contact.phones.first : '';
+    final phoneController = TextEditingController(text: initialPhone);
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Edit Phone Contact', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Edits will be saved to your device contacts and will not alter the user\'s registered profile.',
+              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Phone Number',
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final phone = phoneController.text.trim();
+              if (name.isEmpty || phone.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter both name and phone number')),
+                );
+                return;
+              }
+              if (contact.id == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Cannot edit contact without an ID.')),
+                );
+                return;
+              }
+              Navigator.of(dialogCtx).pop();
+              final success = await controller.updateContact(
+                contactId: contact.id!,
+                newName: name,
+                newPhoneNumber: phone,
+              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success ? 'Device contact updated.' : 'Failed to update contact.',
+                    ),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteContactDialog(
+    BuildContext context,
+    ContactsController controller,
+    DeviceContact contact,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Delete Contact', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Text(
+          'Are you sure you want to delete ${contact.name} from your device contacts?',
+          style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (contact.id == null) return;
+              Navigator.of(dialogCtx).pop();
+              final success = await controller.deleteContact(contact.id!);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success ? 'Contact deleted from device.' : 'Failed to delete contact.',
+                    ),
+                  ),
+                );
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleBlockToggle(
+    BuildContext context,
+    ContactsController controller,
+    UserModel user,
+    bool isBlocked,
+  ) {
+    if (isBlocked) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: const Text('Unblock User', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          content: Text(
+            'Are you sure you want to unblock ${user.name}?',
+            style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(dialogCtx).pop();
+                await controller.unblockUser(user.uid);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${user.name} has been unblocked.')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Unblock'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: const Text('Block User', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          content: Text(
+            'Are you sure you want to block ${user.name}? They will not be able to call you and you will not be able to call them.',
+            style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogCtx).pop();
+                await controller.blockUser(user);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${user.name} has been blocked.')),
+                  );
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Block'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

@@ -5,8 +5,9 @@ import 'package:sqflite/sqflite.dart';
 /// AppDatabase manages the local SQLite database lifecycle for ConnectCall.
 class AppDatabase {
   static const String databaseName = 'connect_call.db';
-  static const int databaseVersion = 1;
+  static const int databaseVersion = 2;
   static const String callHistoryTable = 'call_history';
+  static const String favoriteContactsTable = 'favorite_contacts';
 
   static AppDatabase? _instance;
   Database? _database;
@@ -56,12 +57,10 @@ class AppDatabase {
     );
   }
 
-  /// Create database tables
-  Future<void> _onCreate(Database db, int version) async {
-    debugPrint('AppDatabase: Creating table $callHistoryTable (version: $version)');
-
+  /// Helper to create call_history table and its index
+  static Future<void> createCallHistoryTable(Database db) async {
     await db.execute('''
-      CREATE TABLE $callHistoryTable (
+      CREATE TABLE IF NOT EXISTS $callHistoryTable (
         id TEXT PRIMARY KEY,
         firebaseUid TEXT NOT NULL,
         remoteUserId TEXT,
@@ -84,17 +83,45 @@ class AppDatabase {
       );
     ''');
 
-    // Index for fast user-scoped queries ordered by date
     await db.execute('''
       CREATE INDEX IF NOT EXISTS idx_call_history_user_created 
       ON $callHistoryTable (firebaseUid, createdAt DESC);
     ''');
   }
 
+  /// Helper to create favorite_contacts table and its index
+  static Future<void> createFavoriteContactsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS $favoriteContactsTable (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        firebaseUid TEXT NOT NULL,
+        remoteUserId TEXT NOT NULL,
+        contactName TEXT,
+        phoneNumber TEXT,
+        createdAt INTEGER NOT NULL,
+        UNIQUE(firebaseUid, remoteUserId)
+      );
+    ''');
+
+    await db.execute('''
+      CREATE INDEX IF NOT EXISTS idx_favorite_contacts_user 
+      ON $favoriteContactsTable (firebaseUid, createdAt DESC);
+    ''');
+  }
+
+  /// Create database tables
+  Future<void> _onCreate(Database db, int version) async {
+    debugPrint('AppDatabase: Creating database tables (version: $version)');
+    await createCallHistoryTable(db);
+    await createFavoriteContactsTable(db);
+  }
+
   /// Handle database schema migrations
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     debugPrint('AppDatabase: Upgrading database from $oldVersion to $newVersion');
-    // Reserved for future migrations
+    if (oldVersion < 2) {
+      await createFavoriteContactsTable(db);
+    }
   }
 
   /// Close the database

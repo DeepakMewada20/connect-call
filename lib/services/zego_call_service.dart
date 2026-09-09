@@ -16,6 +16,7 @@ import '../screens/calling/custom_audio_calling_view.dart';
 import '../screens/calling/invite_participant_sheet.dart';
 import '../screens/home/home_controller.dart';
 import 'auth_service.dart';
+import 'block_service.dart';
 import 'call_history_service.dart';
 import 'user_service.dart';
 
@@ -31,16 +32,19 @@ class ZegoCallService {
   final AuthService? _injectedAuthService;
   final UserService? _injectedUserService;
   final CallHistoryService? _injectedCallHistoryService;
+  final BlockService? _injectedBlockService;
 
   ZegoCallService({
     FirebaseFunctions? functions,
     AuthService? authService,
     UserService? userService,
     CallHistoryService? callHistoryService,
+    BlockService? blockService,
   })  : _injectedFunctions = functions,
         _injectedAuthService = authService,
         _injectedUserService = userService,
-        _injectedCallHistoryService = callHistoryService;
+        _injectedCallHistoryService = callHistoryService,
+        _injectedBlockService = blockService;
 
   static final ZegoCallService instance = ZegoCallService();
 
@@ -56,6 +60,8 @@ class ZegoCallService {
       _injectedUserService ?? UserService();
   CallHistoryService get _callHistoryService =>
       _injectedCallHistoryService ?? CallHistoryService.instance;
+  BlockService get _blockService =>
+      _injectedBlockService ?? BlockService.instance;
 
   // Reactive state observables
   final RxBool isInitialized = false.obs;
@@ -272,6 +278,15 @@ class ZegoCallService {
             );
           },
           onIncomingCallReceived: (callID, caller, callType, callees, customData) async {
+            // Check if caller is blocked by current user
+            if (await _blockService.isUserBlocked(targetUid: caller.id)) {
+              debugPrint('ZegoCallService: Incoming call from blocked user ${caller.id} rejected.');
+              try {
+                ZegoUIKitPrebuiltCallInvitationService().reject();
+              } catch (_) {}
+              return;
+            }
+
             _currentSessionCallId = callID;
             activeCallId.value = callID;
             _callConnectedAt = null;
@@ -654,6 +669,19 @@ class ZegoCallService {
   Future<bool> sendAudioCallInvitation({
     required UserModel targetUser,
   }) async {
+    // 0. Centralized non-bypassable block check
+    if (await _blockService.isUserBlocked(targetUid: targetUser.uid)) {
+      Get.snackbar(
+        'Blocked User',
+        'You have blocked ${targetUser.name.isNotEmpty ? targetUser.name : 'this user'}. Unblock them to make calls.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade600,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+      );
+      return false;
+    }
+
     if (Get.testMode) {
       final currentUid = _authService.currentUserId ?? 'test_caller_uid';
       final callID = 'call_${currentUid}_${DateTime.now().millisecondsSinceEpoch}';
@@ -819,6 +847,19 @@ class ZegoCallService {
   Future<bool> sendVideoCallInvitation({
     required UserModel targetUser,
   }) async {
+    // 0. Centralized non-bypassable block check
+    if (await _blockService.isUserBlocked(targetUid: targetUser.uid)) {
+      Get.snackbar(
+        'Blocked User',
+        'You have blocked ${targetUser.name.isNotEmpty ? targetUser.name : 'this user'}. Unblock them to make calls.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade600,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+      );
+      return false;
+    }
+
     if (Get.testMode) {
       final currentUid = _authService.currentUserId ?? 'test_caller_uid';
       final callID = 'call_${currentUid}_${DateTime.now().millisecondsSinceEpoch}';

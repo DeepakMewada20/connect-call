@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
+import '../../models/favorite_contact_model.dart';
+import '../../models/user_model.dart';
 import '../../widgets/call_history_tile.dart';
 import '../calls/calls_screen.dart';
 import '../contacts/contacts_screen.dart';
@@ -78,10 +80,8 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 28),
 
-            // Quick Actions Section
-            _buildSectionTitle('Quick Actions'),
-            const SizedBox(height: 12),
-            _buildQuickActions(),
+            // Favorite Contacts / Most Called Section
+            _buildFavoritesOrMostCalledSection(),
 
             const SizedBox(height: 28),
 
@@ -213,85 +213,320 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickActions() {
-    return Row(
-      children: [
-        // Audio Call Card
-        Expanded(
-          child: _buildActionCard(
-            title: 'Audio Call',
-            subtitle: 'Voice call',
-            icon: Icons.call_rounded,
-            badgeColor: Colors.green,
-            onTap: controller.onAudioCallTap,
+  Widget _buildFavoritesOrMostCalledSection() {
+    return Obx(() {
+      final hasFavorites = controller.favoriteContacts.isNotEmpty;
+      final hasMostCalled = controller.mostCalledContacts.isNotEmpty;
+
+      String title = 'Favorite Contacts';
+      if (!hasFavorites && hasMostCalled) {
+        title = 'Frequently Called';
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildSectionTitle(title),
+              if (hasFavorites || hasMostCalled)
+                TextButton(
+                  onPressed: () => controller.changeTab(1),
+                  child: const Text(
+                    'All Contacts',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ),
-        const SizedBox(width: 14),
-        // Video Call Card
-        Expanded(
-          child: _buildActionCard(
-            title: 'Video Call',
-            subtitle: 'Face to face',
-            icon: Icons.videocam_rounded,
-            badgeColor: AppTheme.primaryColor,
-            onTap: controller.onVideoCallTap,
-          ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          if (hasFavorites)
+            _buildFavoritesList()
+          else if (hasMostCalled)
+            _buildMostCalledList()
+          else
+            _buildFavoritesEmptyState(),
+        ],
+      );
+    });
+  }
+
+  Widget _buildFavoritesList() {
+    return SizedBox(
+      height: 160,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: controller.favoriteContacts.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final fav = controller.favoriteContacts[index];
+          return _buildFavoriteContactCard(fav);
+        },
+      ),
     );
   }
 
-  Widget _buildActionCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color badgeColor,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
+  Widget _buildFavoriteContactCard(FavoriteContactModel fav) {
+    return Container(
+      width: 140,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.dividerColor),
+        border: Border.all(color: AppTheme.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Stack(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: badgeColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: badgeColor, size: 24),
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+                backgroundImage: fav.avatarUrl.isNotEmpty
+                    ? NetworkImage(fav.avatarUrl)
+                    : null,
+                child: fav.avatarUrl.isEmpty
+                    ? Text(
+                        fav.name.isNotEmpty ? fav.name[0].toUpperCase() : '?',
+                        style: const TextStyle(
+                          color: AppTheme.primaryColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      )
+                    : null,
               ),
-              const SizedBox(height: 14),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textSecondary,
+              const Positioned(
+                right: -2,
+                top: -2,
+                child: Icon(
+                  Icons.star_rounded,
+                  size: 18,
+                  color: Color(0xFFF59E0B),
                 ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            fav.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              InkWell(
+                onTap: () => controller.onFavoriteAudioCall(fav),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.call_rounded, size: 16, color: Colors.green),
+                ),
+              ),
+              const SizedBox(width: 12),
+              InkWell(
+                onTap: () => controller.onFavoriteVideoCall(fav),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.videocam_rounded, size: 16, color: AppTheme.primaryColor),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMostCalledList() {
+    return SizedBox(
+      height: 160,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: controller.mostCalledContacts.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final user = controller.mostCalledContacts[index];
+          final callCount = controller.mostCalledCounts[user.uid] ?? 1;
+          return _buildMostCalledContactCard(user, callCount);
+        },
+      ),
+    );
+  }
+
+  Widget _buildMostCalledContactCard(UserModel user, int callCount) {
+    return Container(
+      width: 140,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: Colors.blue.shade50,
+            backgroundImage: user.profileImage.isNotEmpty
+                ? NetworkImage(user.profileImage)
+                : null,
+            child: user.profileImage.isEmpty
+                ? Text(
+                    user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                    style: TextStyle(
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            user.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '$callCount call${callCount > 1 ? 's' : ''}',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              InkWell(
+                onTap: () => controller.onMostCalledAudioCall(user),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.call_rounded, size: 16, color: Colors.green),
+                ),
+              ),
+              const SizedBox(width: 12),
+              InkWell(
+                onTap: () => controller.onMostCalledVideoCall(user),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.videocam_rounded, size: 16, color: AppTheme.primaryColor),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFavoritesEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.dividerColor),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.star_outline_rounded,
+              size: 26,
+              color: Color(0xFFF59E0B),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'No Favorite Contacts',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Star contacts in the Contacts tab for one-tap calling.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: () => controller.changeTab(1),
+            icon: const Icon(Icons.contacts_rounded, size: 16),
+            label: const Text('Go to Contacts'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.primaryColor,
+              textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }
