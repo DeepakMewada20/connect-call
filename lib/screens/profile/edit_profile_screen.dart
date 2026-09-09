@@ -8,12 +8,19 @@ class EditProfileScreen extends GetView<EditProfileController> {
 
   @override
   Widget build(BuildContext context) {
+    final bgColor = AppTheme.backgroundColorOf(context);
+    final surfaceColor = AppTheme.surfaceColorOf(context);
+    final textPrimary = AppTheme.textPrimaryOf(context);
+    final textSecondary = AppTheme.textSecondaryOf(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: bgColor,
       appBar: AppBar(
         title: const Text('Edit Profile'),
         centerTitle: true,
         elevation: 0,
+        backgroundColor: surfaceColor,
+        foregroundColor: textPrimary,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -26,11 +33,11 @@ class EditProfileScreen extends GetView<EditProfileController> {
 
               const SizedBox(height: 12),
 
-              const Text(
+              Text(
                 'Tap avatar to choose a photo',
                 style: TextStyle(
                   fontSize: 13,
-                  color: AppTheme.textSecondary,
+                  color: textSecondary,
                   fontWeight: FontWeight.w400,
                 ),
               ),
@@ -38,12 +45,12 @@ class EditProfileScreen extends GetView<EditProfileController> {
               const SizedBox(height: 32),
 
               // Full Name Input
-              _buildNameField(),
+              _buildNameField(context),
 
               const SizedBox(height: 20),
 
               // Read-only Phone Field
-              _buildPhoneField(),
+              _buildPhoneField(context),
 
               const SizedBox(height: 36),
 
@@ -126,7 +133,10 @@ class EditProfileScreen extends GetView<EditProfileController> {
                 decoration: BoxDecoration(
                   color: AppTheme.primaryColor,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2.5),
+                  border: Border.all(
+                    color: AppTheme.backgroundColorOf(context),
+                    width: 2.5,
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.15),
@@ -148,16 +158,21 @@ class EditProfileScreen extends GetView<EditProfileController> {
     );
   }
 
-  Widget _buildNameField() {
+  Widget _buildNameField(BuildContext context) {
+    final textPrimary = AppTheme.textPrimaryOf(context);
+    final textSecondary = AppTheme.textSecondaryOf(context);
+    final surfaceColor = AppTheme.surfaceColorOf(context);
+    final dividerColor = AppTheme.dividerColorOf(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Full Name',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -165,33 +180,43 @@ class EditProfileScreen extends GetView<EditProfileController> {
           () => TextField(
             controller: controller.nameController,
             textInputAction: TextInputAction.done,
+            cursorColor: AppTheme.primaryColor,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: textPrimary,
+            ),
             decoration: InputDecoration(
               hintText: 'Enter your name',
-              prefixIcon: const Icon(
+              hintStyle: TextStyle(
+                color: textSecondary,
+                fontSize: 15,
+              ),
+              prefixIcon: Icon(
                 Icons.person_outline_rounded,
-                color: AppTheme.textSecondary,
+                color: textSecondary,
                 size: 22,
               ),
               errorText: controller.nameError.value.isNotEmpty
                   ? controller.nameError.value
                   : null,
               filled: true,
-              fillColor: Colors.white,
+              fillColor: surfaceColor,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppTheme.dividerColor),
+                borderSide: BorderSide(color: dividerColor),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppTheme.dividerColor),
+                borderSide: BorderSide(color: dividerColor),
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
+              focusedBorder: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+                borderSide: BorderSide(
                   color: AppTheme.primaryColor,
                   width: 1.5,
                 ),
@@ -203,16 +228,20 @@ class EditProfileScreen extends GetView<EditProfileController> {
     );
   }
 
-  Widget _buildPhoneField() {
+  Widget _buildPhoneField(BuildContext context) {
+    final isDark = AppTheme.isDarkMode(context);
+    final textPrimary = AppTheme.textPrimaryOf(context);
+    final textSecondary = AppTheme.textSecondaryOf(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Phone Number',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -220,27 +249,32 @@ class EditProfileScreen extends GetView<EditProfileController> {
           controller:
               TextEditingController(text: controller.currentUser.phoneNumber),
           enabled: false,
-          style: TextStyle(color: Colors.grey.shade600),
+          style: TextStyle(
+            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+            fontSize: 15,
+          ),
           decoration: InputDecoration(
-            prefixIcon: const Icon(
+            prefixIcon: Icon(
               Icons.phone_outlined,
-              color: AppTheme.textSecondary,
+              color: textSecondary,
               size: 22,
             ),
             helperText: 'Phone number cannot be changed directly.',
             helperStyle: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade500,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade500,
             ),
             filled: true,
-            fillColor: Colors.grey.shade100,
+            fillColor: isDark ? AppTheme.darkSurfaceColor : Colors.grey.shade100,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 14,
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(
+                color: isDark ? AppTheme.darkDividerColor : Colors.grey.shade300,
+              ),
             ),
           ),
         ),

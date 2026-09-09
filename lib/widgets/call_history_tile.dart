@@ -9,6 +9,7 @@ class CallHistoryTile extends StatelessWidget {
   final String? currentUserId;
   final VoidCallback? onRedial;
   final VoidCallback? onTap;
+  final bool showBorder;
 
   const CallHistoryTile({
     super.key,
@@ -16,17 +17,24 @@ class CallHistoryTile extends StatelessWidget {
     this.currentUserId,
     this.onRedial,
     this.onTap,
+    this.showBorder = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppTheme.isDarkMode(context);
+    final cardColor = AppTheme.cardColorOf(context);
+    final textPrimary = AppTheme.textPrimaryOf(context);
+    final textSecondary = AppTheme.textSecondaryOf(context);
+    final dividerColor = AppTheme.dividerColorOf(context);
+
     final effectiveUid = currentUserId ?? AuthService().currentUserId;
     final otherName = call.getOtherUserName(effectiveUid);
     final otherPhoto = call.getOtherUserPhoto(effectiveUid);
     final initial = otherName.isNotEmpty ? otherName[0].toUpperCase() : 'U';
 
     return Material(
-      color: Colors.white,
+      color: cardColor,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap ?? onRedial,
@@ -35,12 +43,14 @@ class CallHistoryTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppTheme.dividerColorOf(context).withValues(alpha: 0.6)),
+            border: showBorder
+                ? Border.all(color: dividerColor.withValues(alpha: isDark ? 0.8 : 0.6))
+                : null,
           ),
           child: Row(
             children: [
               // 1. User Avatar
-              _buildAvatar(otherPhoto, initial),
+              _buildAvatar(context, otherPhoto, initial),
 
               const SizedBox(width: 14),
 
@@ -58,8 +68,8 @@ class CallHistoryTile extends StatelessWidget {
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: call.isMissed
-                            ? Colors.red.shade400
-                            : AppTheme.textPrimaryOf(context),
+                            ? (isDark ? Colors.red.shade300 : Colors.red.shade600)
+                            : textPrimary,
                         letterSpacing: -0.2,
                       ),
                     ),
@@ -76,7 +86,7 @@ class CallHistoryTile extends StatelessWidget {
                               ? Icons.videocam_rounded
                               : Icons.phone_rounded,
                           size: 13,
-                          color: _getStatusColor(),
+                          color: _getStatusColor(context),
                         ),
                         const SizedBox(width: 6),
                         Expanded(
@@ -86,7 +96,7 @@ class CallHistoryTile extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppTheme.textSecondaryOf(context),
+                              color: textSecondary,
                             ),
                           ),
                         ),
@@ -103,7 +113,7 @@ class CallHistoryTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildStatusOrDuration(),
+                  _buildStatusOrDuration(context),
                   const SizedBox(height: 4),
                   if (onRedial != null)
                     IconButton(
@@ -128,11 +138,12 @@ class CallHistoryTile extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar(String? photoUrl, String initial) {
+  Widget _buildAvatar(BuildContext context, String? photoUrl, String initial) {
+    final isDark = AppTheme.isDarkMode(context);
     if (photoUrl != null && photoUrl.isNotEmpty) {
       return CircleAvatar(
         radius: 23,
-        backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+        backgroundColor: AppTheme.primaryColor.withValues(alpha: isDark ? 0.2 : 0.1),
         backgroundImage: NetworkImage(photoUrl),
         onBackgroundImageError: (exception, stackTrace) {},
         child: Text(
@@ -194,25 +205,30 @@ class CallHistoryTile extends StatelessWidget {
     }
   }
 
-  Color _getStatusColor() {
-    if (call.isMissed) return Colors.red.shade600;
-    if (call.isRejected) return Colors.orange.shade700;
-    if (call.isFailed) return Colors.red.shade600;
-    return AppTheme.textSecondary;
+  Color _getStatusColor(BuildContext context) {
+    final isDark = AppTheme.isDarkMode(context);
+    if (call.isMissed) return isDark ? Colors.red.shade400 : Colors.red.shade600;
+    if (call.isRejected) return isDark ? Colors.orange.shade400 : Colors.orange.shade700;
+    if (call.isFailed) return isDark ? Colors.red.shade400 : Colors.red.shade600;
+    return AppTheme.textSecondaryOf(context);
   }
 
-  Widget _buildStatusOrDuration() {
+  Widget _buildStatusOrDuration(BuildContext context) {
+    final isDark = AppTheme.isDarkMode(context);
+
     if (call.isMissed) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.red.shade50,
+          color: isDark
+              ? Colors.red.shade900.withValues(alpha: 0.35)
+              : Colors.red.shade50,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
           'Missed',
           style: TextStyle(
-            color: Colors.red.shade700,
+            color: isDark ? Colors.red.shade300 : Colors.red.shade700,
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
@@ -224,13 +240,15 @@ class CallHistoryTile extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.orange.shade50,
+          color: isDark
+              ? Colors.orange.shade900.withValues(alpha: 0.35)
+              : Colors.orange.shade50,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
           'Rejected',
           style: TextStyle(
-            color: Colors.orange.shade800,
+            color: isDark ? Colors.orange.shade300 : Colors.orange.shade800,
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
@@ -242,13 +260,15 @@ class CallHistoryTile extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.orange.shade50,
+          color: isDark
+              ? Colors.orange.shade900.withValues(alpha: 0.35)
+              : Colors.orange.shade50,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
           'Busy',
           style: TextStyle(
-            color: Colors.orange.shade800,
+            color: isDark ? Colors.orange.shade300 : Colors.orange.shade800,
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
@@ -260,13 +280,15 @@ class CallHistoryTile extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
           'Disconnected',
           style: TextStyle(
-            color: Colors.grey.shade700,
+            color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
@@ -278,13 +300,15 @@ class CallHistoryTile extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.red.shade50,
+          color: isDark
+              ? Colors.red.shade900.withValues(alpha: 0.35)
+              : Colors.red.shade50,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
           'Failed',
           style: TextStyle(
-            color: Colors.red.shade700,
+            color: isDark ? Colors.red.shade300 : Colors.red.shade700,
             fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
@@ -295,10 +319,10 @@ class CallHistoryTile extends StatelessWidget {
     // Ended or Connected: display formatted duration
     return Text(
       call.formattedDuration,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: AppTheme.textSecondary,
+        color: AppTheme.textSecondaryOf(context),
       ),
     );
   }

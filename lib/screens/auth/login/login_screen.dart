@@ -10,8 +10,15 @@ class LoginScreen extends GetView<LoginController> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppTheme.isDarkMode(context);
+    final bgColor = AppTheme.backgroundColorOf(context);
+    final surfaceColor = AppTheme.surfaceColorOf(context);
+    final textPrimary = AppTheme.textPrimaryOf(context);
+    final textSecondary = AppTheme.textSecondaryOf(context);
+    final dividerColor = AppTheme.dividerColorOf(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -37,7 +44,7 @@ class LoginScreen extends GetView<LoginController> {
                           borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.28),
+                              color: AppTheme.primaryColor.withValues(alpha: isDark ? 0.4 : 0.28),
                               blurRadius: 18,
                               offset: const Offset(0, 8),
                             ),
@@ -54,26 +61,26 @@ class LoginScreen extends GetView<LoginController> {
                     const SizedBox(height: 24),
 
                     // Brand Name
-                    const Text(
+                    Text(
                       AppConstants.appName,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         letterSpacing: 0.5,
-                        color: AppTheme.textPrimary,
+                        color: textPrimary,
                       ),
                     ),
 
                     const SizedBox(height: 8),
 
                     // Subtitle
-                    const Text(
+                    Text(
                       'Enter your phone number to sign in or create an account.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppTheme.textSecondary,
+                        color: textSecondary,
                         height: 1.4,
                       ),
                     ),
@@ -81,12 +88,12 @@ class LoginScreen extends GetView<LoginController> {
                     const SizedBox(height: 36),
 
                     // Phone Number Label
-                    const Text(
+                    Text(
                       'Phone Number',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
+                        color: textPrimary,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -100,9 +107,9 @@ class LoginScreen extends GetView<LoginController> {
                           height: 52,
                           padding: const EdgeInsets.symmetric(horizontal: 14),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: surfaceColor,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.dividerColor),
+                            border: Border.all(color: dividerColor),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -115,10 +122,10 @@ class LoginScreen extends GetView<LoginController> {
                               Obx(
                                 () => Text(
                                   controller.selectedCountryCode.value,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w600,
-                                    color: AppTheme.textPrimary,
+                                    color: textPrimary,
                                   ),
                                 ),
                               ),
@@ -134,6 +141,12 @@ class LoginScreen extends GetView<LoginController> {
                             controller: controller.phoneController,
                             keyboardType: TextInputType.phone,
                             autocorrect: false,
+                            cursorColor: AppTheme.primaryColor,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: textPrimary,
+                            ),
                             autofillHints: const [
                               AutofillHints.telephoneNumberNational,
                               AutofillHints.telephoneNumber,
@@ -162,23 +175,27 @@ class LoginScreen extends GetView<LoginController> {
                             validator: controller.validatePhoneNumber,
                             decoration: InputDecoration(
                               hintText: '98765 43210',
+                              hintStyle: TextStyle(
+                                color: textSecondary,
+                                fontSize: 15,
+                              ),
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: surfaceColor,
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 14),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide:
-                                    const BorderSide(color: AppTheme.dividerColor),
+                                    BorderSide(color: dividerColor),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide:
-                                    const BorderSide(color: AppTheme.dividerColor),
+                                    BorderSide(color: dividerColor),
                               ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
+                              focusedBorder: const OutlineInputBorder(
+                                borderRadius: BorderRadius.all(Radius.circular(12)),
+                                borderSide: BorderSide(
                                     color: AppTheme.primaryColor, width: 1.5),
                               ),
                             ),
@@ -187,23 +204,23 @@ class LoginScreen extends GetView<LoginController> {
                       ],
                     ),
 
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-                  // Privacy / SMS disclaimer notice
-                  const Text(
-                    'We will send a 6-digit verification code via SMS to verify your number.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
+                    // Privacy / SMS disclaimer notice
+                    Text(
+                      'We will send a 6-digit verification code via SMS to verify your number.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: textSecondary,
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 28),
+                    const SizedBox(height: 28),
 
-                  // Send OTP Action Button
-                  Obx(
-                    () => ElevatedButton(
+                    // Send OTP Action Button
+                    Obx(
+                      () => ElevatedButton(
                       onPressed:
                           controller.isLoading.value ? null : controller.sendOtp,
                       child: controller.isLoading.value

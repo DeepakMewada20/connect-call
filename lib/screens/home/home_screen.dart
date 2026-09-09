@@ -607,6 +607,7 @@ class HomeScreen extends StatelessWidget {
               call: call,
               currentUserId: controller.currentUid,
               onRedial: () => controller.redial(call),
+              showBorder: false,
             );
           },
         ),

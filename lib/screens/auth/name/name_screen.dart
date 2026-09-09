@@ -8,8 +8,15 @@ class NameScreen extends GetView<NameController> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppTheme.isDarkMode(context);
+    final bgColor = AppTheme.backgroundColorOf(context);
+    final surfaceColor = AppTheme.surfaceColorOf(context);
+    final textPrimary = AppTheme.textPrimaryOf(context);
+    final textSecondary = AppTheme.textSecondaryOf(context);
+    final dividerColor = AppTheme.dividerColorOf(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -27,7 +34,7 @@ class NameScreen extends GetView<NameController> {
                         width: 76,
                         height: 76,
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                          color: AppTheme.primaryColor.withValues(alpha: isDark ? 0.2 : 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -41,26 +48,26 @@ class NameScreen extends GetView<NameController> {
                     const SizedBox(height: 24),
 
                     // Heading
-                    const Text(
+                    Text(
                       "What's your name?",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
                         letterSpacing: -0.3,
-                        color: AppTheme.textPrimary,
+                        color: textPrimary,
                       ),
                     ),
 
                     const SizedBox(height: 8),
 
                     // Subtitle
-                    const Text(
+                    Text(
                       'Please enter your name so your contacts can recognize you on calls.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppTheme.textSecondary,
+                        color: textSecondary,
                         height: 1.4,
                       ),
                     ),
@@ -68,12 +75,12 @@ class NameScreen extends GetView<NameController> {
                     const SizedBox(height: 36),
 
                     // Name Field Label
-                    const Text(
+                    Text(
                       'Full Name',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
+                        color: textPrimary,
                       ),
                     ),
 
@@ -83,6 +90,12 @@ class NameScreen extends GetView<NameController> {
                     TextFormField(
                       controller: controller.nameController,
                       keyboardType: TextInputType.name,
+                      cursorColor: AppTheme.primaryColor,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: textPrimary,
+                      ),
                       autofillHints: const [
                         AutofillHints.name,
                         AutofillHints.givenName,
@@ -92,27 +105,31 @@ class NameScreen extends GetView<NameController> {
                       validator: controller.validateName,
                       decoration: InputDecoration(
                         hintText: 'e.g. Rahul Sharma',
-                        prefixIcon: const Icon(
+                        hintStyle: TextStyle(
+                          color: textSecondary,
+                          fontSize: 15,
+                        ),
+                        prefixIcon: Icon(
                           Icons.badge_outlined,
-                          color: AppTheme.textSecondary,
+                          color: textSecondary,
                         ),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: surfaceColor,
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide:
-                              const BorderSide(color: AppTheme.dividerColor),
+                              BorderSide(color: dividerColor),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide:
-                              const BorderSide(color: AppTheme.dividerColor),
+                              BorderSide(color: dividerColor),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
+                        focusedBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                          borderSide: BorderSide(
                               color: AppTheme.primaryColor, width: 1.5),
                         ),
                       ),

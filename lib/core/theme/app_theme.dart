@@ -143,6 +143,32 @@ class AppTheme {
           elevation: 0,
         ),
       ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceColor,
+        hintStyle: const TextStyle(
+          color: textSecondary,
+          fontSize: 15,
+        ),
+        labelStyle: const TextStyle(
+          color: textPrimary,
+          fontSize: 14,
+        ),
+        prefixIconColor: textSecondary,
+        suffixIconColor: textSecondary,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: dividerColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: dividerColor),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: primaryColor, width: 1.5),
+        ),
+      ),
       textTheme: const TextTheme(
         headlineMedium: TextStyle(
           fontSize: 28,
@@ -255,6 +281,32 @@ class AppTheme {
             fontWeight: FontWeight.w600,
           ),
           elevation: 0,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: darkSurfaceColor,
+        hintStyle: const TextStyle(
+          color: darkTextSecondary,
+          fontSize: 15,
+        ),
+        labelStyle: const TextStyle(
+          color: darkTextPrimary,
+          fontSize: 14,
+        ),
+        prefixIconColor: darkTextSecondary,
+        suffixIconColor: darkTextSecondary,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: darkDividerColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: darkDividerColor),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: primaryColor, width: 1.5),
         ),
       ),
       textTheme: const TextTheme(

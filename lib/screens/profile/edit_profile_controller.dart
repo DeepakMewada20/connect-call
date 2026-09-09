@@ -63,12 +63,25 @@ class EditProfileController extends GetxController {
 
   // Show BottomSheet to choose Camera or Gallery
   void showImageSourceSelector() {
+    final context = Get.context;
+    final isDark = context != null ? AppTheme.isDarkMode(context) : false;
+    final surfaceColor =
+        context != null ? AppTheme.surfaceColorOf(context) : Colors.white;
+    final textPrimary =
+        context != null ? AppTheme.textPrimaryOf(context) : AppTheme.textPrimary;
+    final textSecondary = context != null
+        ? AppTheme.textSecondaryOf(context)
+        : AppTheme.textSecondary;
+    final dividerColor = context != null
+        ? AppTheme.dividerColorOf(context)
+        : AppTheme.dividerColor;
+
     Get.bottomSheet(
       Container(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -79,26 +92,26 @@ class EditProfileController extends GetxController {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Profile Photo',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
+                color: textPrimary,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Choose how you would like to select your photo',
               style: TextStyle(
                 fontSize: 13,
-                color: AppTheme.textSecondary,
+                color: textSecondary,
               ),
             ),
             const SizedBox(height: 20),
@@ -109,7 +122,8 @@ class EditProfileController extends GetxController {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  color: AppTheme.primaryColor
+                      .withValues(alpha: isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -117,20 +131,24 @@ class EditProfileController extends GetxController {
                   color: AppTheme.primaryColor,
                 ),
               ),
-              title: const Text(
+              title: Text(
                 'Take Photo',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: textPrimary,
+                ),
               ),
-              subtitle: const Text(
+              subtitle: Text(
                 'Use camera to take a new picture',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                style: TextStyle(fontSize: 12, color: textSecondary),
               ),
               onTap: () {
                 Get.back();
                 pickAndCropImage(ImageSource.camera);
               },
             ),
-            const Divider(height: 16, color: AppTheme.dividerColor),
+            Divider(height: 16, color: dividerColor),
             // Gallery option
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -138,7 +156,7 @@ class EditProfileController extends GetxController {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.purple.withValues(alpha: 0.1),
+                  color: Colors.purple.withValues(alpha: isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -146,13 +164,17 @@ class EditProfileController extends GetxController {
                   color: Colors.purple,
                 ),
               ),
-              title: const Text(
+              title: Text(
                 'Choose from Gallery',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: textPrimary,
+                ),
               ),
-              subtitle: const Text(
+              subtitle: Text(
                 'Select an existing image from gallery',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                style: TextStyle(fontSize: 12, color: textSecondary),
               ),
               onTap: () {
                 Get.back();

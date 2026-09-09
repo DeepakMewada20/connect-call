@@ -9,13 +9,20 @@ class OtpScreen extends GetView<OtpController> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppTheme.isDarkMode(context);
+    final bgColor = AppTheme.backgroundColorOf(context);
+    final surfaceColor = AppTheme.surfaceColorOf(context);
+    final textPrimary = AppTheme.textPrimaryOf(context);
+    final textSecondary = AppTheme.textSecondaryOf(context);
+    final dividerColor = AppTheme.dividerColorOf(context);
+
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded, color: textPrimary),
           onPressed: controller.goBack,
         ),
       ),
@@ -33,7 +40,7 @@ class OtpScreen extends GetView<OtpController> {
                     width: 72,
                     height: 72,
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                      color: AppTheme.primaryColor.withValues(alpha: isDark ? 0.2 : 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -47,14 +54,14 @@ class OtpScreen extends GetView<OtpController> {
                 const SizedBox(height: 24),
 
                 // Screen Title
-                const Text(
+                Text(
                   'Verify Phone Number',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     letterSpacing: -0.3,
-                    color: AppTheme.textPrimary,
+                    color: textPrimary,
                   ),
                 ),
 
@@ -65,9 +72,9 @@ class OtpScreen extends GetView<OtpController> {
                   () => Text(
                     'We sent a 6-digit verification code to\n${controller.phoneNumber.value}',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: AppTheme.textSecondary,
+                      color: textSecondary,
                       height: 1.4,
                     ),
                   ),
@@ -86,19 +93,19 @@ class OtpScreen extends GetView<OtpController> {
                   defaultPinTheme: PinTheme(
                     width: 48,
                     height: 54,
-                    textStyle: const TextStyle(
+                    textStyle: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: textPrimary,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: surfaceColor,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: AppTheme.dividerColor, width: 1.2),
+                          color: dividerColor, width: 1.2),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.03),
+                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -114,7 +121,7 @@ class OtpScreen extends GetView<OtpController> {
                       color: AppTheme.primaryColor,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: surfaceColor,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                           color: AppTheme.primaryColor, width: 2),
@@ -131,13 +138,13 @@ class OtpScreen extends GetView<OtpController> {
                   submittedPinTheme: PinTheme(
                     width: 48,
                     height: 54,
-                    textStyle: const TextStyle(
+                    textStyle: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: textPrimary,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: isDark ? AppTheme.darkSurfaceColor : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                           color: AppTheme.primaryColor.withValues(alpha: 0.6),
@@ -153,7 +160,7 @@ class OtpScreen extends GetView<OtpController> {
                       color: Colors.red.shade700,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: surfaceColor,
                       borderRadius: BorderRadius.circular(12),
                       border:
                           Border.all(color: Colors.red.shade600, width: 1.5),
@@ -212,11 +219,11 @@ class OtpScreen extends GetView<OtpController> {
                     return Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
+                        Text(
                           "Didn't receive the code?",
                           style: TextStyle(
                             fontSize: 14,
-                            color: AppTheme.textSecondary,
+                            color: textSecondary,
                           ),
                         ),
                         TextButton(
@@ -240,10 +247,10 @@ class OtpScreen extends GetView<OtpController> {
                   return Text(
                     'Resend code in 00:$formattedSeconds',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
-                      color: AppTheme.textSecondary,
+                      color: textSecondary,
                     ),
                   );
                 }),
