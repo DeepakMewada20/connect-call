@@ -614,20 +614,12 @@ class ZegoCallService {
             config.turnOnMicrophoneWhenJoining = true;
             config.useSpeakerWhenJoining = true;
 
-            // For 1-to-1 video calls, use pictureInPicture so local & remote video render properly
-            // without stream collisions. Group calls use gallery layout.
-            if (isGroup) {
-              config.layout = ZegoLayout.gallery(
-                showNewScreenSharingViewInFullscreenMode: true,
-                showScreenSharingFullscreenModeToggleButtonRules:
-                    ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
-              );
-            } else {
-              config.layout = ZegoLayout.pictureInPicture(
-                isSmallViewDraggable: true,
-                switchLargeOrSmallViewByClick: true,
-              );
-            }
+            // Use gallery layout for all video calls to ensure full screen sharing stream rendering
+            config.layout = ZegoLayout.gallery(
+              showNewScreenSharingViewInFullscreenMode: true,
+              showScreenSharingFullscreenModeToggleButtonRules:
+                  ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
+            );
 
             // Screen Sharing configuration
             config.screenSharing = ZegoCallScreenSharingConfig(
@@ -1866,9 +1858,10 @@ class ZegoCallService {
         config.turnOnCameraWhenJoining = true;
         config.turnOnMicrophoneWhenJoining = true;
         config.useSpeakerWhenJoining = true;
-        config.layout = ZegoLayout.pictureInPicture(
-          isSmallViewDraggable: true,
-          switchLargeOrSmallViewByClick: true,
+        config.layout = ZegoLayout.gallery(
+          showNewScreenSharingViewInFullscreenMode: true,
+          showScreenSharingFullscreenModeToggleButtonRules:
+              ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
         );
         config.screenSharing = ZegoCallScreenSharingConfig(
           defaultFullScreen: true,
