@@ -4,12 +4,14 @@ import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
 import '../../core/utils/phone_number_util.dart';
 import '../../models/user_model.dart';
+import '../../routes/app_routes.dart';
 import '../../services/auth_service.dart';
 import '../../services/block_service.dart';
 import '../../services/contact_service.dart';
 import '../../services/favorite_service.dart';
 import '../../services/user_service.dart';
 import '../../services/zego_call_service.dart';
+import 'contact_details_controller.dart';
 
 enum ContactsPermissionState {
   initial,
@@ -366,6 +368,21 @@ class ContactsController extends GetxController {
   // Video call action: initiates real 1-to-1 video call via ZegoCallService
   Future<void> onVideoCallTap(UserModel user) async {
     await activeCallService.sendVideoCallInvitation(targetUser: user);
+  }
+
+  // --- Phase 6: Contact Details Navigation ---
+  void navigateToContactDetails(UserModel user, [DeviceContact? deviceContact]) {
+    final displayName = getDisplayNameForUser(user);
+    final dc = deviceContact ?? findDeviceContactForUser(user);
+    Get.toNamed(
+      AppRoutes.contactDetails,
+      arguments: ContactDetailsArgs(
+        user: user,
+        deviceContact: dc,
+        displayName: displayName,
+        phoneNumber: user.phoneNumber,
+      ),
+    );
   }
 
   // --- Phase 5: Device Contact Management & Linkage ---

@@ -5,6 +5,8 @@ import '../screens/auth/name/name_binding.dart';
 import '../screens/auth/name/name_screen.dart';
 import '../screens/auth/otp/otp_binding.dart';
 import '../screens/auth/otp/otp_screen.dart';
+import '../screens/contacts/contact_details_binding.dart';
+import '../screens/contacts/contact_details_screen.dart';
 import '../screens/home/home_binding.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/profile/edit_profile_binding.dart';
@@ -60,6 +62,13 @@ class AppPages {
       binding: EditProfileBinding(),
       transition: Transition.rightToLeft,
       transitionDuration: const Duration(milliseconds: 300),
+    ),
+    GetPage(
+      name: AppRoutes.contactDetails,
+      page: () => const ContactDetailsScreen(),
+      binding: ContactDetailsBinding(),
+      transition: Transition.rightToLeft,
+      transitionDuration: const Duration(milliseconds: 250),
     ),
   ];
 }

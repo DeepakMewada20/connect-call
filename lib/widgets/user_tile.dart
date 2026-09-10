@@ -15,6 +15,7 @@ class UserTile extends StatelessWidget {
   final VoidCallback? onEditContact;
   final VoidCallback? onDeleteContact;
   final VoidCallback? onToggleBlock;
+  final VoidCallback? onAvatarTap;
 
   const UserTile({
     super.key,
@@ -30,6 +31,7 @@ class UserTile extends StatelessWidget {
     this.onEditContact,
     this.onDeleteContact,
     this.onToggleBlock,
+    this.onAvatarTap,
   });
 
   @override
@@ -57,7 +59,10 @@ class UserTile extends StatelessWidget {
         child: Row(
           children: [
             // User Avatar with Online Indicator
-            _buildAvatarWithStatus(context),
+            GestureDetector(
+              onTap: onAvatarTap,
+              child: _buildAvatarWithStatus(context),
+            ),
             const SizedBox(width: 14),
 
             // User Name and Status / Phone Number
