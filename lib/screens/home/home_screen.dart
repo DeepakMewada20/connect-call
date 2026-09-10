@@ -269,7 +269,7 @@ class HomeScreen extends StatelessWidget {
 
   Widget _buildFavoritesList(BuildContext context) {
     return SizedBox(
-      height: 160,
+      height: 165,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: controller.favoriteContacts.length,
@@ -285,7 +285,7 @@ class HomeScreen extends StatelessWidget {
   Widget _buildFavoriteContactCard(FavoriteContactModel fav, BuildContext context) {
     return Container(
       width: 140,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: AppTheme.cardColorOf(context),
         borderRadius: BorderRadius.circular(16),
@@ -299,12 +299,13 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Stack(
             children: [
               CircleAvatar(
-                radius: 24,
+                radius: 22,
                 backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                 backgroundImage: fav.avatarUrl.isNotEmpty
                     ? NetworkImage(fav.avatarUrl)
@@ -315,7 +316,7 @@ class HomeScreen extends StatelessWidget {
                         style: const TextStyle(
                           color: AppTheme.primaryColor,
                           fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                          fontSize: 16,
                         ),
                       )
                     : null,
@@ -325,24 +326,24 @@ class HomeScreen extends StatelessWidget {
                 top: -2,
                 child: Icon(
                   Icons.star_rounded,
-                  size: 18,
+                  size: 16,
                   color: Color(0xFFF59E0B),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             fav.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
               color: AppTheme.textPrimaryOf(context),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -350,12 +351,12 @@ class HomeScreen extends StatelessWidget {
                 onTap: () => controller.onFavoriteAudioCall(fav),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.call_rounded, size: 16, color: Colors.green),
+                  child: const Icon(Icons.call_rounded, size: 15, color: Colors.green),
                 ),
               ),
               const SizedBox(width: 12),
@@ -363,12 +364,12 @@ class HomeScreen extends StatelessWidget {
                 onTap: () => controller.onFavoriteVideoCall(fav),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryColor.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.videocam_rounded, size: 16, color: AppTheme.primaryColor),
+                  child: const Icon(Icons.videocam_rounded, size: 15, color: AppTheme.primaryColor),
                 ),
               ),
             ],
@@ -380,7 +381,7 @@ class HomeScreen extends StatelessWidget {
 
   Widget _buildMostCalledList(BuildContext context) {
     return SizedBox(
-      height: 160,
+      height: 165,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: controller.mostCalledContacts.length,
@@ -397,7 +398,7 @@ class HomeScreen extends StatelessWidget {
   Widget _buildMostCalledContactCard(UserModel user, int callCount, BuildContext context) {
     return Container(
       width: 140,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
         color: AppTheme.cardColorOf(context),
         borderRadius: BorderRadius.circular(16),
@@ -411,10 +412,11 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CircleAvatar(
-            radius: 24,
+            radius: 22,
             backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
             backgroundImage: user.profileImage.isNotEmpty
                 ? NetworkImage(user.profileImage)
@@ -425,18 +427,18 @@ class HomeScreen extends StatelessWidget {
                     style: const TextStyle(
                       color: AppTheme.primaryColor,
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: 16,
                     ),
                   )
                 : null,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             user.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
               color: AppTheme.textPrimaryOf(context),
             ),
@@ -449,7 +451,7 @@ class HomeScreen extends StatelessWidget {
               color: AppTheme.textSecondaryOf(context),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -457,12 +459,12 @@ class HomeScreen extends StatelessWidget {
                 onTap: () => controller.onMostCalledAudioCall(user),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.call_rounded, size: 16, color: Colors.green),
+                  child: const Icon(Icons.call_rounded, size: 15, color: Colors.green),
                 ),
               ),
               const SizedBox(width: 12),
@@ -470,12 +472,12 @@ class HomeScreen extends StatelessWidget {
                 onTap: () => controller.onMostCalledVideoCall(user),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryColor.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.videocam_rounded, size: 16, color: AppTheme.primaryColor),
+                  child: const Icon(Icons.videocam_rounded, size: 15, color: AppTheme.primaryColor),
                 ),
               ),
             ],
