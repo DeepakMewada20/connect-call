@@ -34,14 +34,14 @@ class MockContactService extends ContactService {
   @override
   Future<PermissionStatus> requestPermission() async => mockPermission;
 
-  @override
+  @override 
   Future<List<DeviceContact>> getContacts() async => mockContacts;
 }
 
 // Mock UserService with exact phone number lookup tracking
 class MockUserService extends UserService {
   final List<UserModel> registeredUsers;
-  final bool shouldThrowNetwork;
+  final bool shouldThrowNetwork;  
   final bool shouldThrowGeneric;
   List<String> lookupPhoneCalls = [];
 
