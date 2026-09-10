@@ -75,7 +75,7 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: Greeting, User Name, Avatar, and Logout action
+            // Header: Greeting, User Name, and Avatar
             _buildHeader(context),
 
             const SizedBox(height: 28),
@@ -187,15 +187,6 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ),
-        ),
-
-        const SizedBox(width: 8),
-
-        // Quick Logout Button
-        IconButton(
-          tooltip: 'Logout',
-          icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-          onPressed: controller.logout,
         ),
       ],
     );

@@ -91,25 +91,27 @@ class ProfileController extends GetxController {
 
   // Display confirmation dialog before logging out
   void showLogoutConfirmation() {
+    final isDark = Get.isDarkMode;
     Get.defaultDialog(
       title: 'Logout',
-      titleStyle: const TextStyle(
+      titleStyle: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
-        color: AppTheme.textPrimary,
+        color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
       ),
       middleText: 'Are you sure you want to logout?',
-      middleTextStyle: const TextStyle(
+      middleTextStyle: TextStyle(
         fontSize: 14,
-        color: AppTheme.textSecondary,
+        color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
       ),
+      backgroundColor: isDark ? AppTheme.darkSurfaceColor : AppTheme.surfaceColor,
       contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       radius: 16,
       textConfirm: 'Logout',
       confirmTextColor: Colors.white,
       buttonColor: Colors.red.shade600,
       textCancel: 'Cancel',
-      cancelTextColor: AppTheme.textPrimary,
+      cancelTextColor: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
       onCancel: () {
         Get.back();
       },
