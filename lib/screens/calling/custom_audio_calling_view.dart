@@ -5,7 +5,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:zego_uikit/zego_uikit.dart';
 import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 import '../../core/theme/app_theme.dart';
-import '../../routes/app_routes.dart';
 import '../../services/auth_service.dart';
 import '../../services/contact_service.dart';
 import '../../services/zego_call_service.dart';
@@ -854,8 +853,6 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
       if (mounted) {
         if (Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
-        } else {
-          Get.offAllNamed(AppRoutes.home);
         }
       }
       return;
@@ -871,8 +868,6 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
       if (mounted) {
         if (Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
-        } else {
-          Get.offAllNamed(AppRoutes.home);
         }
       }
     }

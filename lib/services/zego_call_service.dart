@@ -572,8 +572,8 @@ class ZegoCallService {
                 return;
               }
               try {
-                final nav = navigatorKey.currentState;
-                if (nav != null) {
+                final nav = navigatorKey.currentState ?? Get.key.currentState;
+                if (nav != null && nav.canPop()) {
                   // Only unwind intermediate calling and modal dialog routes back to root HomeScreen
                   nav.popUntil((route) => route.isFirst);
                 }
@@ -584,10 +584,6 @@ class ZegoCallService {
               // Ensure HomeController is alive
               if (!Get.isRegistered<HomeController>()) {
                 Get.put(HomeController(), permanent: true);
-              }
-
-              if (Get.currentRoute != AppRoutes.home && activeCallId.value.isEmpty) {
-                Get.offAllNamed(AppRoutes.home);
               }
             }
 
@@ -2045,18 +2041,14 @@ class ZegoCallService {
     } catch (_) {}
 
     try {
-      final nav = navigatorKey.currentState;
-      if (nav != null) {
+      final nav = navigatorKey.currentState ?? Get.key.currentState;
+      if (nav != null && nav.canPop()) {
         nav.popUntil((route) => route.isFirst);
       }
     } catch (_) {}
 
     if (!Get.isRegistered<HomeController>()) {
       Get.put(HomeController(), permanent: true);
-    }
-
-    if (Get.currentRoute != AppRoutes.home) {
-      Get.offAllNamed(AppRoutes.home);
     }
   }
 }
