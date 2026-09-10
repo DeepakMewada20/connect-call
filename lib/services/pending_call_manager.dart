@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pending_call_model.dart';
 
 /// Delegate signatures for testability
@@ -12,9 +14,12 @@ typedef ClearPendingCallDelegate = Future<void> Function();
 ///
 /// Features:
 /// - In-memory and test-mockable state
+/// - Persistent SharedPreferences backing across background isolates and cold launch
 /// - Safe 60-second automatic expiration checking
 /// - Zero leak: stale calls are automatically purged
 class PendingCallManager {
+  static const String _prefKey = 'connect_call_pending_call_json';
+
   static PendingCallManager? _instance;
   static PendingCallManager get instance => _instance ??= PendingCallManager();
 
@@ -42,6 +47,15 @@ class PendingCallManager {
     _inMemoryPendingCall = call;
     currentPendingCall.value = call;
 
+    if (!Get.testMode) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefKey, jsonEncode(call.toMap()));
+      } catch (e) {
+        debugPrint('[PendingCallManager] Error persisting pending call: $e');
+      }
+    }
+
     if (saveDelegate != null) {
       await saveDelegate!(call);
       return;
@@ -68,6 +82,26 @@ class PendingCallManager {
       return _inMemoryPendingCall;
     }
 
+    if (!Get.testMode) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final jsonStr = prefs.getString(_prefKey);
+        if (jsonStr != null && jsonStr.isNotEmpty) {
+          final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+          final call = PendingCallModel.fromMap(map);
+          if (!call.isExpired) {
+            _inMemoryPendingCall = call;
+            currentPendingCall.value = call;
+            return call;
+          } else {
+            await prefs.remove(_prefKey);
+          }
+        }
+      } catch (e) {
+        debugPrint('[PendingCallManager] Error reading from prefs: $e');
+      }
+    }
+
     return null;
   }
 
@@ -75,6 +109,15 @@ class PendingCallManager {
   Future<void> clearPendingCall() async {
     _inMemoryPendingCall = null;
     currentPendingCall.value = null;
+
+    if (!Get.testMode) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_prefKey);
+      } catch (e) {
+        debugPrint('[PendingCallManager] Error clearing prefs: $e');
+      }
+    }
 
     if (clearDelegate != null) {
       await clearDelegate!();

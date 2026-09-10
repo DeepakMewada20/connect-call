@@ -114,6 +114,24 @@ class CallNotificationService {
 
       _isInitialized = true;
       debugPrint('[CALL PUSH] CallNotificationService initialized successfully.');
+
+      // Check if application was launched directly by tapping a notification or action
+      try {
+        final details = await _notificationsPlugin.getNotificationAppLaunchDetails();
+        if (details != null && details.didNotificationLaunchApp && details.notificationResponse != null) {
+          debugPrint('[CALL PUSH] App launched via notification! Action: ${details.notificationResponse?.actionId}');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _handleNotificationResponse(
+              details.notificationResponse!,
+              onBodyTap: onNotificationBodyTapped,
+              onAccept: onAcceptTapped,
+              onReject: onRejectTapped,
+            );
+          });
+        }
+      } catch (e) {
+        debugPrint('[CALL PUSH] Error reading getNotificationAppLaunchDetails: $e');
+      }
     } catch (e) {
       debugPrint('[CALL PUSH] Failed to initialize CallNotificationService: $e');
     }

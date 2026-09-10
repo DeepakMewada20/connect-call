@@ -15,9 +15,12 @@ import '../models/zego_token_response.dart';
 import '../models/pending_call_model.dart';
 import '../routes/app_routes.dart';
 import '../screens/calling/custom_audio_calling_view.dart';
+import '../screens/calling/custom_screen_sharing_button.dart';
 import '../screens/calling/invite_participant_sheet.dart';
 import '../screens/calling/screen_sharing_indicator.dart';
 import '../screens/home/home_controller.dart';
+// ignore: implementation_imports
+import 'package:zego_uikit/src/services/internal/internal.dart';
 import '../widgets/network_quality_indicator.dart';
 import 'auth_service.dart';
 import 'block_service.dart';
@@ -91,6 +94,8 @@ class ZegoCallService {
   /// Public getter for current session target name
   String? get currentSessionTargetName => _currentSessionTargetName;
 
+  ZegoTokenResponse? _cachedTokenResponse;
+
   /// Request a secure temporary session token from the Firebase Cloud Function
   Future<ZegoTokenResponse> getZegoToken() async {
     final currentUid = _authService.currentUserId;
@@ -114,6 +119,7 @@ class ZegoCallService {
         throw 'Invalid token response received from server.';
       }
 
+      _cachedTokenResponse = tokenResponse;
       return tokenResponse;
     } on FirebaseFunctionsException catch (e) {
       debugPrint('getZegoToken FirebaseFunctionsException: ${e.code} - ${e.message}');
@@ -554,15 +560,12 @@ class ZegoCallService {
             config.turnOnMicrophoneWhenJoining = true;
             config.useSpeakerWhenJoining = true;
 
-            if (isGroup) {
-              config.layout = ZegoLayout.gallery();
-            } else {
-              config.layout = ZegoLayout.pictureInPicture(
-                isSmallViewDraggable: true,
-                switchLargeOrSmallViewByClick: true,
-                smallViewPosition: ZegoViewPosition.topRight,
-              );
-            }
+            // Use gallery layout for all video calls to ensure full screen sharing stream rendering
+            config.layout = ZegoLayout.gallery(
+              showNewScreenSharingViewInFullscreenMode: true,
+              showScreenSharingFullscreenModeToggleButtonRules:
+                  ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
+            );
 
             // Screen Sharing configuration
             config.screenSharing = ZegoCallScreenSharingConfig(
@@ -587,7 +590,7 @@ class ZegoCallService {
               ],
             );
 
-            // In-call invite button in top bar to add more participants into conference
+            // In-call invite button & Screen share quick action in top bar
             config.topMenuBar.extendButtons = [
               Builder(
                 builder: (context) => IconButton(
@@ -605,17 +608,27 @@ class ZegoCallService {
                   },
                 ),
               ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: CustomScreenSharingButton(
+                  buttonSize: Size(34, 34),
+                  iconSize: Size(18, 18),
+                ),
+              ),
             ];
 
-            config.bottomMenuBar.maxCount = 5;
+            config.bottomMenuBar.maxCount = 6;
             config.bottomMenuBar.buttons = [
               ZegoCallMenuBarButtonName.toggleMicrophoneButton,
               ZegoCallMenuBarButtonName.toggleCameraButton,
-              ZegoCallMenuBarButtonName.toggleScreenSharingButton,
               ZegoCallMenuBarButtonName.hangUpButton,
               ZegoCallMenuBarButtonName.switchCameraButton,
               ZegoCallMenuBarButtonName.switchAudioOutputButton,
               ZegoCallMenuBarButtonName.showMemberListButton,
+            ];
+            // Use custom screen sharing button to avoid Zego's internal stop-button check bug
+            config.bottomMenuBar.extendButtons = [
+              const CustomScreenSharingButton(),
             ];
             config.audioVideoView.useVideoViewAspectFill = true;
             config.audioVideoView.showCameraStateOnView = true;
@@ -774,9 +787,16 @@ class ZegoCallService {
         return true;
       }
       if (!Get.testMode) {
+        // Prevent ZegoUIKit's buggy double-start on Android 14+ that cancels MediaProjection token
+        try {
+          ZegoUIKitCore.shared.coreData.isFirstScreenSharing = false;
+        } catch (e) {
+          debugPrint('[ZegoCallService] isFirstScreenSharing override error: $e');
+        }
         await ZegoUIKit().startSharingScreen();
       }
       isScreenSharing.value = true;
+      debugPrint('[ZegoCallService] Screen sharing successfully initiated.');
       return true;
     } catch (e) {
       debugPrint('[ZegoCallService] startScreenSharing exception: $e');
@@ -797,10 +817,7 @@ class ZegoCallService {
   /// Stop screen sharing cleanly without ending the call
   Future<void> stopScreenSharing() async {
     try {
-      if (!isScreenSharing.value && (Get.testMode || !ZegoUIKit().getScreenSharingStateNotifier().value)) {
-        isScreenSharing.value = false;
-        return;
-      }
+      debugPrint('[ZegoCallService] Stopping screen sharing...');
       if (!Get.testMode) {
         await ZegoUIKit().stopSharingScreen();
       }
@@ -808,6 +825,10 @@ class ZegoCallService {
       debugPrint('[ZegoCallService] stopScreenSharing error: $e');
     } finally {
       isScreenSharing.value = false;
+      try {
+        ZegoUIKit().getScreenSharingStateNotifier().value = false;
+      } catch (_) {}
+      debugPrint('[ZegoCallService] Screen sharing cleanly stopped.');
     }
   }
 
@@ -1668,12 +1689,30 @@ class ZegoCallService {
       return;
     }
 
-    // 4. Ensure CallService is initialized
+    // 4. Ensure CallService is initialized and token is ready
     if (!isInitialized.value) {
       final ok = await initZegoCallService();
       if (!ok && !Get.testMode) {
         debugPrint('[CALL PUSH] Failed to initialize ZegoCallService on accept.');
         return;
+      }
+    }
+
+    ZegoTokenResponse tokenData;
+    if (_cachedTokenResponse != null && _cachedTokenResponse!.isValid) {
+      tokenData = _cachedTokenResponse!;
+    } else {
+      try {
+        tokenData = await getZegoToken();
+        _cachedTokenResponse = tokenData;
+      } catch (e) {
+        debugPrint('[CALL PUSH] Error getting token on accept: $e');
+        tokenData = ZegoTokenResponse(
+          appId: _cachedTokenResponse?.appId ?? 0,
+          token: '',
+          userId: _authService.currentUserId ?? '',
+          expiresIn: 3600,
+        );
       }
     }
 
@@ -1707,6 +1746,12 @@ class ZegoCallService {
 
     if (Get.testMode) return;
 
+    // Ensure we transition from splash to home so the call page has a stable parent route
+    if (Get.currentRoute == AppRoutes.splash || Get.currentRoute.isEmpty) {
+      Get.offAllNamed(AppRoutes.home);
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+
     // 6. Navigate to active call screen
     final nav = navigatorKey.currentState ?? Get.key.currentState;
     if (nav != null) {
@@ -1715,18 +1760,25 @@ class ZegoCallService {
         config.turnOnCameraWhenJoining = true;
         config.turnOnMicrophoneWhenJoining = true;
         config.useSpeakerWhenJoining = true;
+        config.layout = ZegoLayout.gallery(
+          showNewScreenSharingViewInFullscreenMode: true,
+          showScreenSharingFullscreenModeToggleButtonRules:
+              ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
+        );
         config.screenSharing = ZegoCallScreenSharingConfig(
           defaultFullScreen: true,
         );
-        config.bottomMenuBar.maxCount = 5;
+        config.bottomMenuBar.maxCount = 6;
         config.bottomMenuBar.buttons = [
           ZegoCallMenuBarButtonName.toggleMicrophoneButton,
           ZegoCallMenuBarButtonName.toggleCameraButton,
-          ZegoCallMenuBarButtonName.toggleScreenSharingButton,
           ZegoCallMenuBarButtonName.hangUpButton,
           ZegoCallMenuBarButtonName.switchCameraButton,
           ZegoCallMenuBarButtonName.switchAudioOutputButton,
           ZegoCallMenuBarButtonName.showMemberListButton,
+        ];
+        config.bottomMenuBar.extendButtons = [
+          const CustomScreenSharingButton(),
         ];
         config.foreground = const Stack(
           children: [
@@ -1747,8 +1799,8 @@ class ZegoCallService {
         nav.push(
           MaterialPageRoute(
             builder: (context) => ZegoUIKitPrebuiltCall(
-              appID: 0,
-              appSign: '',
+              appID: tokenData.appId,
+              token: tokenData.token,
               userID: currentUid,
               userName: currentName,
               callID: call.callId,
@@ -1763,11 +1815,20 @@ class ZegoCallService {
         );
       } else {
         final config = ZegoUIKitPrebuiltCallConfig.oneOnOneVoiceCall();
+        config.turnOnCameraWhenJoining = false;
+        config.turnOnMicrophoneWhenJoining = true;
+        config.useSpeakerWhenJoining = true;
+        config.topMenuBar.isVisible = false;
+        config.bottomMenuBar.buttons = [];
+        config.audioVideoView.showCameraStateOnView = false;
+        config.audioVideoView.showSoundWavesInAudioMode = true;
+        config.audioVideoView.showAvatarInAudioMode = true;
+        config.foreground = const CustomAudioCallingView();
         nav.push(
           MaterialPageRoute(
             builder: (context) => ZegoUIKitPrebuiltCall(
-              appID: 0,
-              appSign: '',
+              appID: tokenData.appId,
+              token: tokenData.token,
               userID: currentUid,
               userName: currentName,
               callID: call.callId,

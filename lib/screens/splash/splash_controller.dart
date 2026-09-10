@@ -6,6 +6,7 @@ import '../../routes/app_routes.dart';
 import '../../services/fcm_service.dart';
 import '../../services/pending_call_manager.dart';
 import '../../services/user_service.dart';
+import '../../services/zego_call_service.dart';
 import '../calling/incoming_call_decision_dialog.dart';
 
 class SplashController extends GetxController {
@@ -56,15 +57,21 @@ class SplashController extends GetxController {
             // Sync FCM token upon successful authentication
             FcmService.instance.syncFcmToken();
 
+            // If an active call is already underway or connecting, do NOT wipe navigation stack!
+            if (ZegoCallService.instance.activeCallId.value.isNotEmpty) {
+              debugPrint('[SPLASH] Active call detected (${ZegoCallService.instance.activeCallId.value}). Retaining call screen.');
+              return;
+            }
+
             // Check if application was launched from incoming call notification
             final pendingCall = await PendingCallManager.instance.getPendingCall();
 
             Get.offAllNamed(AppRoutes.home);
 
-            if (pendingCall != null && !pendingCall.isExpired) {
+            if (pendingCall != null && !pendingCall.isExpired && ZegoCallService.instance.activeCallId.value.isEmpty) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 final ctx = Get.context;
-                if (ctx != null) {
+                if (ctx != null && ZegoCallService.instance.activeCallId.value.isEmpty) {
                   IncomingCallDecisionDialog.show(ctx, pendingCall);
                 }
               });
