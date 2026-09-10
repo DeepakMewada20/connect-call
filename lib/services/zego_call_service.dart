@@ -323,6 +323,21 @@ class ZegoCallService {
               return;
             }
 
+            // If this call is already active or being connected, do not reset state or show duplicate dialog
+            if (activeCallId.value == callID && (_callConnectedAt != null || isCalling.value)) {
+              debugPrint('[ZegoCallService] Call $callID is already connecting or active. Skipping duplicate dialog.');
+              return;
+            }
+
+            // If another call is already underway, reject new incoming call as busy
+            if (activeCallId.value.isNotEmpty && activeCallId.value != callID) {
+              debugPrint('[ZegoCallService] Another call is active (${activeCallId.value}). Rejecting $callID as busy.');
+              try {
+                await ZegoUIKitPrebuiltCallInvitationService().reject();
+              } catch (_) {}
+              return;
+            }
+
             _currentSessionCallId = callID;
             activeCallId.value = callID;
             _callConnectedAt = null;
@@ -382,6 +397,8 @@ class ZegoCallService {
               expiresAt: now.add(const Duration(seconds: 60)),
             );
             await PendingCallManager.instance.savePendingCall(pendingCall);
+
+
 
             if (isAppInForeground) {
               // CASE 1: App is FOREGROUND
@@ -1769,11 +1786,17 @@ class ZegoCallService {
     // ringtones on both devices stop, and the call connects
     bool acceptedByZego = false;
     if (!Get.testMode) {
-      try {
-        acceptedByZego = await ZegoUIKitPrebuiltCallInvitationService().accept();
-        debugPrint('[CALL PUSH] ZegoUIKitPrebuiltCallInvitationService().accept() result: $acceptedByZego');
-      } catch (e) {
-        debugPrint('[CALL PUSH] ZegoUIKitPrebuiltCallInvitationService().accept() error: $e');
+      for (int i = 0; i < 6; i++) {
+        try {
+          acceptedByZego = await ZegoUIKitPrebuiltCallInvitationService().accept();
+          if (acceptedByZego) {
+            debugPrint('[CALL PUSH] ZEGOCLOUD accepted call on attempt ${i + 1}');
+            break;
+          }
+        } catch (e) {
+          debugPrint('[CALL PUSH] Zego accept attempt $i error: $e');
+        }
+        await Future.delayed(const Duration(milliseconds: 250));
       }
 
       if (!acceptedByZego) {
@@ -1958,9 +1981,14 @@ class ZegoCallService {
 
     // 2. Reject via ZEGOCLOUD signaling if active
     if (!Get.testMode) {
-      try {
-        await ZegoUIKitPrebuiltCallInvitationService().reject();
-      } catch (_) {}
+      bool rejected = false;
+      for (int i = 0; i < 4; i++) {
+        try {
+          rejected = await ZegoUIKitPrebuiltCallInvitationService().reject();
+          if (rejected) break;
+        } catch (_) {}
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
       try {
         await ZegoUIKit().getSignalingPlugin().refuseInvitation(
           inviterID: call.callerUid,
@@ -2030,18 +2058,29 @@ class ZegoCallService {
     activeCallId.value = '';
 
     try {
-      defaultAction();
-    } catch (_) {}
-
-    try {
-      final nav = navigatorKey.currentState ?? Get.key.currentState;
-      if (nav != null && nav.canPop()) {
-        nav.popUntil((route) => route.isFirst);
+      if (_currentSessionTargetUid != null && _currentSessionTargetUid!.isNotEmpty && endCallId.isNotEmpty) {
+        _dispatchFcmCallCancel(
+          receiverUid: _currentSessionTargetUid!,
+          callId: endCallId,
+        );
       }
     } catch (_) {}
 
-    if (!Get.isRegistered<HomeController>()) {
-      Get.put(HomeController(), permanent: true);
-    }
+    try {
+      defaultAction();
+    } catch (_) {}
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final nav = navigatorKey.currentState ?? Get.key.currentState;
+        if (nav != null && nav.canPop()) {
+          nav.popUntil((route) => route.isFirst);
+        }
+      } catch (_) {}
+
+      if (!Get.isRegistered<HomeController>()) {
+        Get.put(HomeController(), permanent: true);
+      }
+    });
   }
 }

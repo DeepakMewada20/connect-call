@@ -119,15 +119,21 @@ class CallNotificationService {
       try {
         final details = await _notificationsPlugin.getNotificationAppLaunchDetails();
         if (details != null && details.didNotificationLaunchApp && details.notificationResponse != null) {
-          debugPrint('[CALL PUSH] App launched via notification! Action: ${details.notificationResponse?.actionId}');
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _handleNotificationResponse(
-              details.notificationResponse!,
-              onBodyTap: onNotificationBodyTapped,
-              onAccept: onAcceptTapped,
-              onReject: onRejectTapped,
-            );
-          });
+          final actionId = details.notificationResponse?.actionId;
+          final resolvedAction = (actionId == null || actionId.isEmpty) ? 'body' : actionId;
+          debugPrint('[CALL PUSH] App launched via notification! Action: $resolvedAction');
+          PendingCallManager.instance.launchAction = resolvedAction;
+
+          final payload = details.notificationResponse?.payload;
+          if (payload != null && payload.isNotEmpty) {
+            try {
+              final map = jsonDecode(payload) as Map<String, dynamic>;
+              final pendingCall = PendingCallModel.fromMap(map);
+              if (!pendingCall.isExpired) {
+                await PendingCallManager.instance.savePendingCall(pendingCall);
+              }
+            } catch (_) {}
+          }
         }
       } catch (e) {
         debugPrint('[CALL PUSH] Error reading getNotificationAppLaunchDetails: $e');

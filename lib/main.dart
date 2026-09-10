@@ -6,6 +6,7 @@ import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'routes/app_pages.dart';
+import 'routes/app_routes.dart';
 import 'screens/calling/incoming_call_decision_dialog.dart';
 import 'services/call_notification_service.dart';
 import 'services/fcm_service.dart';
@@ -30,14 +31,18 @@ Future<void> main() async {
     await CallNotificationService.instance.initialize(
       onNotificationBodyTapped: (call) {
         debugPrint('[CALL PUSH] Notification body tapped -> Opening incoming call decision.');
-        final context = ZegoCallService.navigatorKey.currentContext ?? Get.context;
-        if (context != null) {
-          IncomingCallDecisionDialog.show(context, call);
+        if (Get.currentRoute != AppRoutes.splash && Get.currentRoute.isNotEmpty) {
+          final context = ZegoCallService.navigatorKey.currentContext ?? Get.context;
+          if (context != null) {
+            IncomingCallDecisionDialog.show(context, call);
+          }
         }
       },
       onAcceptTapped: (call) {
         debugPrint('[CALL PUSH] Notification ACCEPT action tapped.');
-        ZegoCallService.instance.acceptCallFromNotification(call);
+        if (Get.currentRoute != AppRoutes.splash && Get.currentRoute.isNotEmpty) {
+          ZegoCallService.instance.acceptCallFromNotification(call);
+        }
       },
       onRejectTapped: (call) {
         debugPrint('[CALL PUSH] Notification REJECT action tapped.');
@@ -48,9 +53,11 @@ Future<void> main() async {
     // Initialize FCM listeners and token synchronization
     await FcmService.instance.initialize(
       onIncomingCallTapped: (call) {
-        final context = ZegoCallService.navigatorKey.currentContext ?? Get.context;
-        if (context != null) {
-          IncomingCallDecisionDialog.show(context, call);
+        if (Get.currentRoute != AppRoutes.splash && Get.currentRoute.isNotEmpty) {
+          final context = ZegoCallService.navigatorKey.currentContext ?? Get.context;
+          if (context != null) {
+            IncomingCallDecisionDialog.show(context, call);
+          }
         }
       },
     );

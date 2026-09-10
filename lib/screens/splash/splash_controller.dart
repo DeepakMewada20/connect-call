@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_constants.dart';
 import '../../routes/app_routes.dart';
+import '../../services/call_notification_service.dart';
 import '../../services/fcm_service.dart';
 import '../../services/pending_call_manager.dart';
 import '../../services/user_service.dart';
@@ -65,17 +66,49 @@ class SplashController extends GetxController {
 
             // Check if application was launched from incoming call notification
             final pendingCall = await PendingCallManager.instance.getPendingCall();
+            final launchAction = PendingCallManager.instance.launchAction;
 
-            Get.offAllNamed(AppRoutes.home);
+            if (pendingCall != null && !pendingCall.isExpired) {
+              debugPrint('[SPLASH] Incoming call detected on launch: ${pendingCall.callId}, action: $launchAction');
 
-            if (pendingCall != null && !pendingCall.isExpired && ZegoCallService.instance.activeCallId.value.isEmpty) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                final ctx = Get.context;
-                if (ctx != null && ZegoCallService.instance.activeCallId.value.isEmpty) {
-                  IncomingCallDecisionDialog.show(ctx, pendingCall);
+              // 1. Ensure ZEGOCLOUD Call Service is initialized and connected to ZIM
+              if (!ZegoCallService.instance.isInitialized.value) {
+                await ZegoCallService.instance.initZegoCallService();
+              }
+
+              // 2. Set HomeScreen as root route so any pop lands safely on Home
+              Get.offAllNamed(AppRoutes.home);
+
+              // 3. Process the pending call action on top of HomeScreen
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                PendingCallManager.instance.launchAction = null;
+                if (launchAction == CallNotificationService.actionAccept) {
+                  debugPrint('[SPLASH] Executing accept for cold launched call: ${pendingCall.callId}');
+                  await ZegoCallService.instance.acceptCallFromNotification(pendingCall);
+                } else if (launchAction == CallNotificationService.actionReject) {
+                  debugPrint('[SPLASH] Executing reject for cold launched call: ${pendingCall.callId}');
+                  await ZegoCallService.instance.rejectCallFromNotification(pendingCall);
+                } else {
+                  final ctx = Get.context;
+                  if (ctx != null && ZegoCallService.instance.activeCallId.value.isEmpty) {
+                    debugPrint('[SPLASH] Displaying IncomingCallDecisionDialog on HomeScreen.');
+                    IncomingCallDecisionDialog.show(
+                      ctx,
+                      pendingCall,
+                      onAccept: () async {
+                        await ZegoCallService.instance.acceptCallFromNotification(pendingCall);
+                      },
+                      onReject: () async {
+                        await ZegoCallService.instance.rejectCallFromNotification(pendingCall);
+                      },
+                    );
+                  }
                 }
               });
+              return;
             }
+
+            Get.offAllNamed(AppRoutes.home);
           } else {
             Get.offAllNamed(
               AppRoutes.name,

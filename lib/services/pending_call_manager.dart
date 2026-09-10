@@ -40,6 +40,9 @@ class PendingCallManager {
 
   PendingCallModel? _inMemoryPendingCall;
 
+  /// Tracks notification action ('accept', 'reject', or 'body') during cold launch
+  String? launchAction;
+
   final Rx<PendingCallModel?> currentPendingCall = Rx<PendingCallModel?>(null);
 
   /// Saves an incoming call payload to pending state
