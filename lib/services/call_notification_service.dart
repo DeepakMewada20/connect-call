@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/pending_call_model.dart';
 import 'pending_call_manager.dart';
@@ -33,9 +34,13 @@ class CallNotificationService {
     _instance = service;
   }
 
-  static const String channelId = 'incoming_calls';
+  static const String channelId = 'incoming_calls_v2';
+  static const String oldChannelId = 'incoming_calls';
   static const String channelName = 'Incoming Calls';
   static const String channelDescription = 'High-priority channel for incoming audio and video calls';
+
+  static const AndroidNotificationSound callRingtoneSound = RawResourceAndroidNotificationSound('call_ringtone');
+  static final Int64List callVibrationPattern = Int64List.fromList([0, 1000, 800, 1000, 800, 1000]);
 
   static const String actionAccept = 'action_accept';
   static const String actionReject = 'action_reject';
@@ -85,19 +90,27 @@ class CallNotificationService {
         onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
 
-      // Create Android Notification Channel with high importance and default call sound
+      // Create Android Notification Channel with high importance and call ringtone
       final androidNotificationChannel = AndroidNotificationChannel(
         channelId,
         channelName,
         description: channelDescription,
         importance: Importance.max,
         playSound: true,
+        sound: callRingtoneSound,
         enableVibration: true,
+        vibrationPattern: callVibrationPattern,
+        audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
       );
 
-      await _notificationsPlugin
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(androidNotificationChannel);
+      final androidImplementation = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImplementation != null) {
+        try {
+          await androidImplementation.deleteNotificationChannel(channelId: oldChannelId);
+        } catch (_) {}
+        await androidImplementation.createNotificationChannel(androidNotificationChannel);
+      }
 
       _isInitialized = true;
       debugPrint('[CALL PUSH] CallNotificationService initialized successfully.');
@@ -163,6 +176,10 @@ class CallNotificationService {
       return;
     }
 
+    if (!_isInitialized) {
+      await initialize();
+    }
+
     final int notificationId = call.callId.hashCode.abs();
     final callTypeLabel = call.isVideo ? 'Incoming Video Call' : 'Incoming Audio Call';
 
@@ -177,18 +194,27 @@ class CallNotificationService {
       autoCancel: false,
       ongoing: true,
       playSound: true,
+      sound: callRingtoneSound,
+      audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
       enableVibration: true,
+      vibrationPattern: callVibrationPattern,
+      color: const Color(0xFF2563EB),
+      colorized: true,
       visibility: NotificationVisibility.public,
       actions: const <AndroidNotificationAction>[
         AndroidNotificationAction(
           actionAccept,
-          'Accept',
+          '🔵 Accept',
+          titleColor: Color(0xFF2563EB),
+          icon: DrawableResourceAndroidBitmap('ic_call_accept'),
           showsUserInterface: true,
           cancelNotification: true,
         ),
         AndroidNotificationAction(
           actionReject,
-          'Reject',
+          '🔴 Reject',
+          titleColor: Color(0xFFEF4444),
+          icon: DrawableResourceAndroidBitmap('ic_call_reject'),
           showsUserInterface: false,
           cancelNotification: true,
         ),
