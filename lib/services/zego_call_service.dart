@@ -16,6 +16,7 @@ import '../models/pending_call_model.dart';
 import '../routes/app_routes.dart';
 import '../screens/calling/custom_audio_calling_view.dart';
 import '../screens/calling/custom_screen_sharing_button.dart';
+import '../screens/calling/incoming_call_decision_dialog.dart';
 import '../screens/calling/invite_participant_sheet.dart';
 import '../screens/calling/screen_sharing_indicator.dart';
 import '../screens/home/home_controller.dart';
@@ -80,6 +81,19 @@ class ZegoCallService {
   final RxString activeCallId = ''.obs;
   final RxBool isScreenSharing = false.obs;
   StreamSubscription? _screenCaptureErrorSubscription;
+
+  /// Optional override for testing or simulated foreground states
+  bool? isForegroundOverride;
+
+  /// Returns true if OUR Flutter app is currently in foreground (resumed and visible)
+  bool get isAppInForeground {
+    if (isForegroundOverride != null) return isForegroundOverride!;
+    try {
+      return WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    } catch (_) {
+      return false;
+    }
+  }
 
   String? _initializedUserId;
 
@@ -243,6 +257,9 @@ class ZegoCallService {
           invitee: ZegoCallInvitationInviteeUIConfig(
             defaultCameraOn: true,
             showVideoOnCalling: true,
+            popUp: ZegoCallInvitationNotifyPopUpUIConfig(
+              visible: false,
+            ),
             backgroundBuilder: (context, size, info) {
               if (info.callType == ZegoCallInvitationType.videoCall) {
                 return null;
@@ -352,6 +369,46 @@ class ZegoCallService {
                 durationSeconds: 0,
               ),
             );
+
+            final now = DateTime.now();
+            final pendingCall = PendingCallModel(
+              callId: callID,
+              callerUid: caller.id,
+              callerName: resolvedCallerName,
+              callerZegoUserId: caller.id,
+              callerPhoto: null,
+              callType: _currentSessionIsVideo ? 'video' : 'audio',
+              timestamp: now,
+              expiresAt: now.add(const Duration(seconds: 60)),
+            );
+            await PendingCallManager.instance.savePendingCall(pendingCall);
+
+            if (isAppInForeground) {
+              // CASE 1: App is FOREGROUND
+              // Direct full-screen Incoming Call Screen. No top notification/banner!
+              debugPrint('[ZegoCallService] App is FOREGROUND -> Opening direct Incoming Call Screen.');
+              IncomingCallDecisionDialog.show(
+                null,
+                pendingCall,
+                onAccept: () async {
+                  final accepted = await ZegoUIKitPrebuiltCallInvitationService().accept();
+                  if (!accepted) {
+                    await acceptCallFromNotification(pendingCall);
+                  }
+                },
+                onReject: () async {
+                  try {
+                    await ZegoUIKitPrebuiltCallInvitationService().reject();
+                  } catch (_) {}
+                  await rejectCallFromNotification(pendingCall);
+                },
+              );
+            } else {
+              // CASE 2 / CASE 3: Another app is foreground / Our app is NOT foreground
+              // Do NOT force-launch the app over another app!
+              debugPrint('[ZegoCallService] App is NOT FOREGROUND -> Showing Android system notification.');
+              await CallNotificationService.instance.showIncomingCallNotification(pendingCall);
+            }
           },
           onOutgoingCallAccepted: (callID, callee) async {
             _callConnectedAt ??= DateTime.now();
@@ -362,6 +419,7 @@ class ZegoCallService {
             );
           },
           onIncomingCallAcceptButtonPressed: () async {
+            IncomingCallDecisionDialog.dismissCurrent();
             _callConnectedAt ??= DateTime.now();
             NetworkQualityService.instance.startMonitoring();
             final targetCallId = activeCallId.value.isNotEmpty
@@ -393,6 +451,7 @@ class ZegoCallService {
             );
           },
           onIncomingCallDeclineButtonPressed: () async {
+            IncomingCallDecisionDialog.dismissCurrent();
             NetworkQualityService.instance.stopMonitoring();
             final targetCallId = activeCallId.value.isNotEmpty
                 ? activeCallId.value
@@ -407,6 +466,9 @@ class ZegoCallService {
             }
           },
           onIncomingCallTimeout: (callID, caller) async {
+            IncomingCallDecisionDialog.dismissCurrent(callID);
+            await CallNotificationService.instance.dismissNotification(callID);
+            await PendingCallManager.instance.clearPendingCall();
             NetworkQualityService.instance.stopMonitoring();
             await _callHistoryService.updateCallStatus(
               callId: callID,
@@ -416,6 +478,9 @@ class ZegoCallService {
             );
           },
           onIncomingCallCanceled: (callID, caller, customData) async {
+            IncomingCallDecisionDialog.dismissCurrent(callID);
+            await CallNotificationService.instance.dismissNotification(callID);
+            await PendingCallManager.instance.clearPendingCall();
             NetworkQualityService.instance.stopMonitoring();
             await _callHistoryService.updateCallStatus(
               callId: callID,

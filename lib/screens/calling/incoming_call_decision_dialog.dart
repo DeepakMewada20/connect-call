@@ -26,15 +26,61 @@ class IncomingCallDecisionDialog extends StatefulWidget {
     this.onReject,
   });
 
-  static Future<void> show(BuildContext context, PendingCallModel call) async {
+  static String? _activeCallId;
+  static BuildContext? _activeDialogContext;
+
+  static bool get isShowing => _activeDialogContext != null;
+  static String? get activeCallId => _activeCallId;
+
+  static Future<void> show(
+    BuildContext? context,
+    PendingCallModel call, {
+    VoidCallback? onAccept,
+    VoidCallback? onReject,
+  }) async {
+    final targetContext = context ?? ZegoCallService.navigatorKey.currentContext ?? Get.context;
+    if (targetContext == null) return;
     if (call.isExpired) return;
+    if (_activeCallId == call.callId && isShowing) {
+      debugPrint('[IncomingCallDecisionDialog] Dialog already showing for call ${call.callId}. Ignoring duplicate.');
+      return;
+    }
+
+    _activeCallId = call.callId;
 
     await showDialog<void>(
-      context: context,
+      context: targetContext,
       barrierDismissible: false,
       routeSettings: const RouteSettings(name: '/incoming_call_decision'),
-      builder: (dialogContext) => IncomingCallDecisionDialog(pendingCall: call),
+      builder: (dialogContext) {
+        _activeDialogContext = dialogContext;
+        return IncomingCallDecisionDialog(
+          pendingCall: call,
+          onAccept: onAccept,
+          onReject: onReject,
+        );
+      },
     );
+
+    if (_activeCallId == call.callId) {
+      _activeCallId = null;
+      _activeDialogContext = null;
+    }
+  }
+
+  static void dismissCurrent([String? callId]) {
+    if (callId != null && _activeCallId != null && _activeCallId != callId) {
+      return;
+    }
+    if (_activeDialogContext != null) {
+      try {
+        if (Navigator.of(_activeDialogContext!, rootNavigator: true).canPop()) {
+          Navigator.of(_activeDialogContext!, rootNavigator: true).pop();
+        }
+      } catch (_) {}
+      _activeDialogContext = null;
+      _activeCallId = null;
+    }
   }
 
   @override
@@ -109,6 +155,8 @@ class _IncomingCallDecisionDialogState extends State<IncomingCallDecisionDialog>
     if (_isActionTaken) return;
     _isActionTaken = true;
     _countdownTimer?.cancel();
+    IncomingCallDecisionDialog._activeCallId = null;
+    IncomingCallDecisionDialog._activeDialogContext = null;
 
     if (Navigator.of(context, rootNavigator: true).canPop()) {
       Navigator.of(context, rootNavigator: true).pop();
@@ -125,6 +173,8 @@ class _IncomingCallDecisionDialogState extends State<IncomingCallDecisionDialog>
     if (_isActionTaken) return;
     _isActionTaken = true;
     _countdownTimer?.cancel();
+    IncomingCallDecisionDialog._activeCallId = null;
+    IncomingCallDecisionDialog._activeDialogContext = null;
 
     if (Navigator.of(context, rootNavigator: true).canPop()) {
       Navigator.of(context, rootNavigator: true).pop();

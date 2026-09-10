@@ -3,9 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import '../models/pending_call_model.dart';
+import '../screens/calling/incoming_call_decision_dialog.dart';
 import 'auth_service.dart';
 import 'call_notification_service.dart';
 import 'pending_call_manager.dart';
+import 'zego_call_service.dart';
 
 typedef FcmTokenSyncDelegate = Future<void> Function(String uid, String token);
 typedef FcmTokenCleanDelegate = Future<void> Function(String uid);
@@ -128,10 +130,16 @@ class FcmService {
           final pendingCall = PendingCallModel.fromFcmPayload(data);
           if (!pendingCall.isExpired) {
             await PendingCallManager.instance.savePendingCall(pendingCall);
+            // If our app is not currently in foreground (e.g. another app is open),
+            // ensure system notification is presented with [Reject] [Accept]
+            if (!ZegoCallService.instance.isAppInForeground) {
+              await CallNotificationService.instance.showIncomingCallNotification(pendingCall);
+            }
           }
         } else if (type == 'call_cancelled') {
           final callId = data['callId'] as String?;
           if (callId != null && callId.isNotEmpty) {
+            IncomingCallDecisionDialog.dismissCurrent(callId);
             await CallNotificationService.instance.dismissNotification(callId);
             await PendingCallManager.instance.clearPendingCall();
           }
