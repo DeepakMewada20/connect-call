@@ -258,5 +258,55 @@ void main() {
       expect(notificationCall!.callId, 'bg_call_005');
       expect(notificationCall!.isVideo, isTrue);
     });
+
+    testWidgets('Video call accept from IncomingCallDecisionDialog executes cleanly and triggers accept callback',
+        (tester) async {
+      final pendingVideoCall = PendingCallModel(
+        callId: 'video_call_accept_001',
+        callerUid: 'caller_video',
+        callerName: 'Frank',
+        callerZegoUserId: 'caller_video',
+        callType: 'video',
+        timestamp: DateTime.now(),
+        expiresAt: DateTime.now().add(const Duration(seconds: 60)),
+      );
+
+      bool accepted = false;
+
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      IncomingCallDecisionDialog.show(
+                        context,
+                        pendingVideoCall,
+                        onAccept: () => accepted = true,
+                      );
+                    },
+                    child: const Text('Show Video Call'),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Show Video Call'));
+      await tester.pumpAndSettle();
+
+      expect(IncomingCallDecisionDialog.isShowing, isTrue);
+      expect(find.text('Incoming Video Call'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('incoming_call_accept_button')));
+      await tester.pumpAndSettle();
+
+      expect(accepted, isTrue);
+      expect(IncomingCallDecisionDialog.isShowing, isFalse);
+    });
   });
 }

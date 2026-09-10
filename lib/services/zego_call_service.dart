@@ -256,7 +256,7 @@ class ZegoCallService {
           ),
           invitee: ZegoCallInvitationInviteeUIConfig(
             defaultCameraOn: true,
-            showVideoOnCalling: true,
+            showVideoOnCalling: false,
             popUp: ZegoCallInvitationNotifyPopUpUIConfig(
               visible: false,
             ),
@@ -567,6 +567,10 @@ class ZegoCallService {
             // Cleanly pop any residual invitation / calling pages (e.g. ZegoCallingPage)
             // back to the root HomeScreen to prevent blank/black screens on call termination.
             void returnToHomeSafely() {
+              // Guard: Do not unwind navigation if a call is currently connecting or active
+              if (activeCallId.value.isNotEmpty || isCalling.value) {
+                return;
+              }
               try {
                 final nav = navigatorKey.currentState;
                 if (nav != null) {
@@ -582,16 +586,12 @@ class ZegoCallService {
                 Get.put(HomeController(), permanent: true);
               }
 
-              if (Get.currentRoute != AppRoutes.home) {
+              if (Get.currentRoute != AppRoutes.home && activeCallId.value.isEmpty) {
                 Get.offAllNamed(AppRoutes.home);
               }
             }
 
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              returnToHomeSafely();
-            });
-
-            Future.delayed(const Duration(milliseconds: 100), () {
               returnToHomeSafely();
             });
           },
@@ -609,13 +609,6 @@ class ZegoCallService {
           final isGroup = data.invitees.length > 1;
 
           if (data.type == ZegoCallInvitationType.videoCall) {
-            // Proactively ensure camera is permitted and turned on for receiver
-            Permission.camera.request().then((status) {
-              if (status.isGranted) {
-                ZegoUIKit().turnCameraOn(true);
-              }
-            });
-
             // Functional 1-to-1 or Multi-user Video Conference Call
             final config = isGroup
                 ? ZegoUIKitPrebuiltCallConfig.groupVideoCall()
@@ -625,12 +618,20 @@ class ZegoCallService {
             config.turnOnMicrophoneWhenJoining = true;
             config.useSpeakerWhenJoining = true;
 
-            // Use gallery layout for all video calls to ensure full screen sharing stream rendering
-            config.layout = ZegoLayout.gallery(
-              showNewScreenSharingViewInFullscreenMode: true,
-              showScreenSharingFullscreenModeToggleButtonRules:
-                  ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
-            );
+            // For 1-to-1 video calls, use pictureInPicture so local & remote video render properly
+            // without stream collisions. Group calls use gallery layout.
+            if (isGroup) {
+              config.layout = ZegoLayout.gallery(
+                showNewScreenSharingViewInFullscreenMode: true,
+                showScreenSharingFullscreenModeToggleButtonRules:
+                    ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
+              );
+            } else {
+              config.layout = ZegoLayout.pictureInPicture(
+                isSmallViewDraggable: true,
+                switchLargeOrSmallViewByClick: true,
+              );
+            }
 
             // Screen Sharing configuration
             config.screenSharing = ZegoCallScreenSharingConfig(
@@ -1763,6 +1764,43 @@ class ZegoCallService {
       }
     }
 
+    // Ensure permissions are acquired before entering room
+    if (!Get.testMode) {
+      try {
+        if (call.isVideo) {
+          await [Permission.camera, Permission.microphone].request();
+        } else {
+          await Permission.microphone.request();
+        }
+      } catch (e) {
+        debugPrint('[CALL PUSH] Permission request error: $e');
+      }
+    }
+
+    // 4a. Accept the incoming invitation via ZEGOCLOUD signaling so the caller is notified,
+    // ringtones on both devices stop, and the call connects
+    bool acceptedByZego = false;
+    if (!Get.testMode) {
+      try {
+        acceptedByZego = await ZegoUIKitPrebuiltCallInvitationService().accept();
+        debugPrint('[CALL PUSH] ZegoUIKitPrebuiltCallInvitationService().accept() result: $acceptedByZego');
+      } catch (e) {
+        debugPrint('[CALL PUSH] ZegoUIKitPrebuiltCallInvitationService().accept() error: $e');
+      }
+
+      if (!acceptedByZego) {
+        try {
+          await ZegoUIKit().getSignalingPlugin().acceptInvitation(
+            inviterID: call.callerUid,
+            data: '',
+          );
+          debugPrint('[CALL PUSH] Accepted invitation via ZIM signaling plugin for call: ${call.callId}');
+        } catch (e) {
+          debugPrint('[CALL PUSH] ZIM signaling accept error: $e');
+        }
+      }
+    }
+
     ZegoTokenResponse tokenData;
     if (_cachedTokenResponse != null && _cachedTokenResponse!.isValid) {
       tokenData = _cachedTokenResponse!;
@@ -1811,13 +1849,20 @@ class ZegoCallService {
 
     if (Get.testMode) return;
 
+    // If acceptedByZego is true, ZEGOCLOUD's invitation service automatically enters
+    // the call room and presents the prebuilt call screen via requireConfig!
+    if (acceptedByZego) {
+      debugPrint('[CALL PUSH] Call connected via ZEGOCLOUD invitation service. Skipping manual navigation.');
+      return;
+    }
+
     // Ensure we transition from splash to home so the call page has a stable parent route
     if (Get.currentRoute == AppRoutes.splash || Get.currentRoute.isEmpty) {
       Get.offAllNamed(AppRoutes.home);
       await Future.delayed(const Duration(milliseconds: 200));
     }
 
-    // 6. Navigate to active call screen
+    // 6. Navigate to active call screen if not already entered by ZEGOCLOUD
     final nav = navigatorKey.currentState ?? Get.key.currentState;
     if (nav != null) {
       if (call.isVideo) {
@@ -1825,10 +1870,9 @@ class ZegoCallService {
         config.turnOnCameraWhenJoining = true;
         config.turnOnMicrophoneWhenJoining = true;
         config.useSpeakerWhenJoining = true;
-        config.layout = ZegoLayout.gallery(
-          showNewScreenSharingViewInFullscreenMode: true,
-          showScreenSharingFullscreenModeToggleButtonRules:
-              ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
+        config.layout = ZegoLayout.pictureInPicture(
+          isSmallViewDraggable: true,
+          switchLargeOrSmallViewByClick: true,
         );
         config.screenSharing = ZegoCallScreenSharingConfig(
           defaultFullScreen: true,
@@ -1926,7 +1970,13 @@ class ZegoCallService {
     // 2. Reject via ZEGOCLOUD signaling if active
     if (!Get.testMode) {
       try {
-        ZegoUIKitPrebuiltCallInvitationService().reject();
+        await ZegoUIKitPrebuiltCallInvitationService().reject();
+      } catch (_) {}
+      try {
+        await ZegoUIKit().getSignalingPlugin().refuseInvitation(
+          inviterID: call.callerUid,
+          data: '',
+        );
       } catch (_) {}
     }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/pending_call_model.dart';
 import '../../services/zego_call_service.dart';
@@ -72,14 +73,13 @@ class IncomingCallDecisionDialog extends StatefulWidget {
     if (callId != null && _activeCallId != null && _activeCallId != callId) {
       return;
     }
-    if (_activeDialogContext != null) {
+    final ctx = _activeDialogContext;
+    _activeDialogContext = null;
+    _activeCallId = null;
+    if (ctx != null && ctx.mounted && Navigator.canPop(ctx)) {
       try {
-        if (Navigator.of(_activeDialogContext!, rootNavigator: true).canPop()) {
-          Navigator.of(_activeDialogContext!, rootNavigator: true).pop();
-        }
+        Navigator.of(ctx).pop();
       } catch (_) {}
-      _activeDialogContext = null;
-      _activeCallId = null;
     }
   }
 
@@ -155,11 +155,34 @@ class _IncomingCallDecisionDialogState extends State<IncomingCallDecisionDialog>
     if (_isActionTaken) return;
     _isActionTaken = true;
     _countdownTimer?.cancel();
+    final ctx = IncomingCallDecisionDialog._activeDialogContext ?? context;
     IncomingCallDecisionDialog._activeCallId = null;
     IncomingCallDecisionDialog._activeDialogContext = null;
 
-    if (Navigator.of(context, rootNavigator: true).canPop()) {
-      Navigator.of(context, rootNavigator: true).pop();
+    // Ensure camera and microphone permissions are granted before call screen mounts
+    // so Android does not pause the Flutter activity or drop the camera hardware session
+    if (!Get.testMode) {
+      try {
+        if (widget.pendingCall.isVideo) {
+          await [Permission.camera, Permission.microphone].request();
+        } else {
+          await Permission.microphone.request();
+        }
+      } catch (e) {
+        debugPrint('[IncomingCallDecisionDialog] Permission request error: $e');
+      }
+    }
+
+    // Dismiss dialog using its local context, avoiding rootNavigator race conditions
+    if (ctx.mounted && Navigator.canPop(ctx)) {
+      try {
+        Navigator.of(ctx).pop();
+      } catch (_) {}
+    }
+
+    // Allow the Navigator route pop animation to completely settle before Zego pushes the call screen
+    if (!Get.testMode) {
+      await Future.delayed(const Duration(milliseconds: 120));
     }
 
     if (widget.onAccept != null) {
@@ -173,11 +196,14 @@ class _IncomingCallDecisionDialogState extends State<IncomingCallDecisionDialog>
     if (_isActionTaken) return;
     _isActionTaken = true;
     _countdownTimer?.cancel();
+    final ctx = IncomingCallDecisionDialog._activeDialogContext ?? context;
     IncomingCallDecisionDialog._activeCallId = null;
     IncomingCallDecisionDialog._activeDialogContext = null;
 
-    if (Navigator.of(context, rootNavigator: true).canPop()) {
-      Navigator.of(context, rootNavigator: true).pop();
+    if (ctx.mounted && Navigator.canPop(ctx)) {
+      try {
+        Navigator.of(ctx).pop();
+      } catch (_) {}
     }
 
     if (widget.onReject != null) {
