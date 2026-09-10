@@ -792,6 +792,7 @@ void main() {
             user: user,
             isFavorite: true,
             isBlocked: false,
+            showActionButtons: true,
             onAudioCall: () {},
             onVideoCall: () {},
             onToggleFavorite: () {},

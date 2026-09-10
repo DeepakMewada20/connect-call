@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:connect_call/routes/app_pages.dart';
+import 'package:connect_call/routes/app_routes.dart';
 
 // Mock ContactService for testing device contacts and permissions
 class MockContactService extends ContactService {
@@ -648,13 +650,21 @@ void main() {
       Get.put<ContactsController>(controller);
 
       await tester.pumpWidget(
-        const GetMaterialApp(home: ContactsScreen()),
+        GetMaterialApp(
+          home: const ContactsScreen(),
+          getPages: AppPages.pages,
+        ),
       );
       await tester.pumpAndSettle();
 
       // Displays saved device contact name as title and registered name in subtitle
       expect(find.text('Rahul Contact'), findsOneWidget);
       expect(find.textContaining('Rahul Sharma'), findsOneWidget);
+
+      // Contact card displays Audio and Video call buttons, but 3-dots menu is removed
+      expect(find.byIcon(Icons.call_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.videocam_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
 
       // Tap audio call
       await tester.tap(find.byIcon(Icons.call_rounded));
@@ -665,6 +675,11 @@ void main() {
       await tester.tap(find.byIcon(Icons.videocam_rounded));
       await tester.pumpAndSettle();
       expect(callService.lastVideoTarget?.uid, 'u_rahul');
+
+      // Tap contact name opens Contact Details screen
+      await tester.tap(find.text('Rahul Contact'));
+      await tester.pumpAndSettle();
+      expect(Get.currentRoute, AppRoutes.contactDetails);
     });
   });
 }

@@ -320,5 +320,87 @@ void main() {
       expect(find.text('Contact is currently Blocked'), findsOneWidget);
       expect(find.text('Unblock Contact'), findsOneWidget);
     });
+
+    testWidgets('Condition 1: Saved contact displays saved phonebook name and registered alias', (tester) async {
+      final user = UserModel(
+        uid: 'user_saved_8',
+        name: 'Deepak Mewada',
+        phoneNumber: '+919876543210',
+        createdAt: DateTime.now(),
+      );
+
+      // Contact is in contactService cache under 'Papa (Mobile)'
+      contactService.updateCacheFromContacts([
+        const DeviceContact(
+          id: 'dc_papa',
+          displayName: 'Papa (Mobile)',
+          phoneNumbers: ['+919876543210'],
+        ),
+      ]);
+
+      Get.put(ContactDetailsController(
+        initialArgs: ContactDetailsArgs(
+          user: user,
+          deviceContact: const DeviceContact(
+            id: 'dc_papa',
+            displayName: 'Papa (Mobile)',
+            phoneNumbers: ['+919876543210'],
+          ),
+          displayName: 'Papa (Mobile)',
+          phoneNumber: '+919876543210',
+        ),
+        contactService: contactService,
+        favoriteService: favoriteService,
+        blockService: blockService,
+        zegoCallService: zegoCallService,
+      ));
+
+      await tester.pumpWidget(const GetMaterialApp(
+        home: ContactDetailsScreen(),
+      ));
+      await tester.pumpAndSettle();
+
+      // Primary title is the saved phonebook name
+      expect(find.text('Papa (Mobile)'), findsWidgets);
+      // Secondary subtitle shows registered account name
+      expect(find.text('Registered as: Deepak Mewada'), findsOneWidget);
+      // Edit contact is available
+      expect(find.text('Edit Contact'), findsOneWidget);
+    });
+
+    testWidgets('Condition 2: Unsaved contact displays registered login name and Save to Contacts option', (tester) async {
+      final user = UserModel(
+        uid: 'user_unsaved_9',
+        name: 'Anjali Verma',
+        phoneNumber: '+919777788888',
+        createdAt: DateTime.now(),
+      );
+
+      // Empty device contacts cache for this number
+      contactService.updateCacheFromContacts([]);
+
+      Get.put(ContactDetailsController(
+        initialArgs: ContactDetailsArgs(
+          user: user,
+          phoneNumber: '+919777788888',
+        ),
+        contactService: contactService,
+        favoriteService: favoriteService,
+        blockService: blockService,
+        zegoCallService: zegoCallService,
+      ));
+
+      await tester.pumpWidget(const GetMaterialApp(
+        home: ContactDetailsScreen(),
+      ));
+      await tester.pumpAndSettle();
+
+      // Primary title is the registered login name
+      expect(find.text('Anjali Verma'), findsWidgets);
+      // "Registered as: Anjali Verma" is NOT shown because it is redundant
+      expect(find.text('Registered as: Anjali Verma'), findsNothing);
+      // Save to Contacts action is available
+      expect(find.text('Save to Contacts'), findsOneWidget);
+    });
   });
 }

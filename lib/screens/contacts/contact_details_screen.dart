@@ -62,6 +62,7 @@ class ContactDetailsScreen extends StatelessWidget {
           final currentName = controller.displayName.value;
           final currentPhone = controller.phoneNumber.value;
           final isBlk = controller.isBlocked;
+          final isSaved = controller.isSavedContact;
           final formattedPhone = PhoneNumberUtil.formatForDisplay(currentPhone);
 
           return SingleChildScrollView(
@@ -75,6 +76,8 @@ class ContactDetailsScreen extends StatelessWidget {
                 const SizedBox(height: 18),
 
                 // 2. Name & Registered Alias
+                // Condition 1: Saved in contacts -> shows saved contact name
+                // Condition 2: Not saved in contacts -> shows registered login name
                 Text(
                   currentName.isNotEmpty ? currentName : 'Unknown Contact',
                   textAlign: TextAlign.center,
@@ -85,9 +88,11 @@ class ContactDetailsScreen extends StatelessWidget {
                     letterSpacing: -0.5,
                   ),
                 ),
-                if (targetUser != null &&
+                // Only show "Registered as: <name>" when the contact is saved in device under a different name
+                if (isSaved &&
+                    targetUser != null &&
                     targetUser.name.trim().isNotEmpty &&
-                    targetUser.name.trim() != currentName.trim()) ...[
+                    targetUser.name.trim().toLowerCase() != currentName.trim().toLowerCase()) ...[
                   const SizedBox(height: 4),
                   Text(
                     'Registered as: ${targetUser.name}',
@@ -225,7 +230,7 @@ class ContactDetailsScreen extends StatelessWidget {
                       subtitle: 'Send contact info via share sheet',
                       onTap: controller.shareContact,
                     ),
-                    if (controller.deviceContact.value != null) ...[
+                    if (isSaved && controller.deviceContact.value != null) ...[
                       _buildDivider(context),
                       _buildActionTile(
                         context,
@@ -234,6 +239,16 @@ class ContactDetailsScreen extends StatelessWidget {
                         title: 'Edit Contact',
                         subtitle: 'Update name or number on phone',
                         onTap: () => controller.showEditContactDialog(context),
+                      ),
+                    ] else ...[
+                      _buildDivider(context),
+                      _buildActionTile(
+                        context,
+                        icon: Icons.person_add_alt_1_outlined,
+                        iconColor: AppTheme.primaryColor,
+                        title: 'Save to Contacts',
+                        subtitle: 'Add this user to phone contacts',
+                        onTap: () => controller.showAddContactDialog(context),
                       ),
                     ],
                   ],
@@ -257,7 +272,7 @@ class ContactDetailsScreen extends StatelessWidget {
                           : 'Prevent this contact from calling you',
                       onTap: () => controller.confirmToggleBlock(context),
                     ),
-                    if (controller.deviceContact.value != null) ...[
+                    if (isSaved && controller.deviceContact.value != null) ...[
                       _buildDivider(context),
                       _buildActionTile(
                         context,

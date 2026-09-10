@@ -61,6 +61,16 @@ class ContactDetailsController extends GetxController {
       user.value != null && _favoriteService.isFavoriteSync(user.value!.uid);
   bool get isBlocked =>
       user.value != null && _blockService.isBlockedSync(user.value!.uid);
+  bool get isSavedContact {
+    if (deviceContact.value != null &&
+        deviceContact.value!.displayName.trim().isNotEmpty) {
+      return true;
+    }
+    final phone = phoneNumber.value;
+    if (phone.isEmpty) return false;
+    final saved = _contactService.getSavedContactName(phone);
+    return saved != null && saved.trim().isNotEmpty;
+  }
 
   @override
   void onInit() {
@@ -90,32 +100,59 @@ class ContactDetailsController extends GetxController {
 
   void _initDeviceContactAndName() {
     final phone = phoneNumber.value;
-    if (phone.isNotEmpty) {
-      // Resolve device contact if not directly provided
-      if (deviceContact.value == null) {
-        final cached = _contactService.cachedContacts;
-        final norm = PhoneNumberUtil.normalize(phone);
-        for (final dc in cached) {
-          for (final p in dc.phones) {
-            if (PhoneNumberUtil.normalize(p) == norm) {
-              deviceContact.value = dc;
-              break;
-            }
-          }
-          if (deviceContact.value != null) break;
-        }
-      }
+    final regName = user.value?.name ?? '';
 
-      // Resolve proper display name (saved device contact name takes precedence)
-      final resolved = _contactService.resolveDisplayName(
-        phoneNumber: phone,
-        registeredName: user.value?.name ?? displayName.value,
-        fallback: 'Unknown User',
-      );
-      if (resolved.isNotEmpty) {
-        displayName.value = resolved;
+    // Step 1: If device contact is not yet matched, search cached device contacts
+    if (deviceContact.value == null && phone.isNotEmpty) {
+      final cached = _contactService.cachedContacts;
+      final norm = PhoneNumberUtil.normalize(phone);
+      final digits = phone.replaceAll(RegExp(r'[^\d]'), '');
+      final last10 = digits.length >= 10 ? digits.substring(digits.length - 10) : '';
+
+      for (final dc in cached) {
+        for (final p in dc.phones) {
+          final pNorm = PhoneNumberUtil.normalize(p);
+          final pDigits = p.replaceAll(RegExp(r'[^\d]'), '');
+          if (pNorm == norm || (last10.isNotEmpty && pDigits.endsWith(last10))) {
+            deviceContact.value = dc;
+            break;
+          }
+        }
+        if (deviceContact.value != null) break;
       }
     }
+
+    // Step 2: Name Resolution Logic:
+    // Condition 1: If contact IS saved in mobile contacts -> show saved name
+    if (deviceContact.value != null &&
+        deviceContact.value!.displayName.trim().isNotEmpty) {
+      displayName.value = deviceContact.value!.displayName.trim();
+      return;
+    }
+
+    final savedName = _contactService.getSavedContactName(phone);
+    if (savedName != null && savedName.trim().isNotEmpty) {
+      displayName.value = savedName.trim();
+      return;
+    }
+
+    // Condition 2: If contact IS NOT saved in mobile contacts -> show registered login name
+    if (regName.trim().isNotEmpty) {
+      displayName.value = regName.trim();
+      return;
+    }
+
+    // Fallback: Use passed displayName if valid and not a placeholder
+    if (displayName.value.trim().isNotEmpty &&
+        displayName.value != 'Unknown User' &&
+        displayName.value != 'Unknown Contact') {
+      return;
+    }
+
+    // Ultimate fallback: Formatted phone number
+    displayName.value = phone.isNotEmpty
+        ? PhoneNumberUtil.formatForDisplay(phone)
+        : 'Unknown Contact';
   }
 
   void _showSnackbar(
@@ -466,6 +503,105 @@ class ContactDetailsController extends GetxController {
         }
       } catch (e) {
         _showSnackbar('Error', 'Failed to update contact: $e');
+      } finally {
+        isLoading.value = false;
+      }
+    }
+  }
+
+  // --- Add to Phone Contacts (for Unsaved Contacts) ---
+
+  Future<void> showAddContactDialog(BuildContext context) async {
+    final nameController = TextEditingController(text: displayName.value);
+    final phoneController = TextEditingController(text: phoneNumber.value);
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Save to Phone Contacts', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'Contact Name',
+                prefixIcon: const Icon(Icons.person_outline_rounded),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'Phone Number',
+                prefixIcon: const Icon(Icons.phone_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancel', style: TextStyle(color: AppTheme.textSecondaryOf(context))),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.trim().isEmpty || phoneController.text.trim().isEmpty) {
+                _showSnackbar('Error', 'Name and phone number cannot be empty.');
+                return;
+              }
+              Navigator.of(ctx).pop(true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true) {
+      final newName = nameController.text.trim();
+      final newPhone = phoneController.text.trim();
+
+      isLoading.value = true;
+      try {
+        final contactId = await _contactService.createContact(
+          name: newName,
+          phoneNumber: newPhone,
+        );
+
+        if (contactId.isNotEmpty) {
+          displayName.value = newName;
+          phoneNumber.value = newPhone;
+          deviceContact.value = DeviceContact(
+            id: contactId,
+            displayName: newName,
+            phoneNumbers: [newPhone],
+          );
+
+          if (Get.isRegistered<ContactsController>()) {
+            Get.find<ContactsController>().loadContacts();
+          }
+
+          _showSnackbar(
+            'Contact Saved',
+            '$newName saved to your phone contacts.',
+            backgroundColor: Colors.green.shade600,
+            colorText: Colors.white,
+          );
+        } else {
+          _showSnackbar('Save Failed', 'Could not save contact to phonebook.');
+        }
+      } catch (e) {
+        _showSnackbar('Error', 'Failed to save contact: $e');
       } finally {
         isLoading.value = false;
       }

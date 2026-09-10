@@ -16,6 +16,8 @@ class UserTile extends StatelessWidget {
   final VoidCallback? onDeleteContact;
   final VoidCallback? onToggleBlock;
   final VoidCallback? onAvatarTap;
+  final VoidCallback? onTap;
+  final bool showActionButtons;
 
   const UserTile({
     super.key,
@@ -32,6 +34,8 @@ class UserTile extends StatelessWidget {
     this.onDeleteContact,
     this.onToggleBlock,
     this.onAvatarTap,
+    this.onTap,
+    this.showActionButtons = false,
   });
 
   @override
@@ -54,15 +58,20 @@ class UserTile extends StatelessWidget {
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            // User Avatar with Online Indicator
-            GestureDetector(
-              onTap: onAvatarTap,
-              child: _buildAvatarWithStatus(context),
-            ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap ?? onAvatarTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                // User Avatar with Online Indicator
+                GestureDetector(
+                  onTap: onAvatarTap ?? onTap,
+                  child: _buildAvatarWithStatus(context),
+                ),
             const SizedBox(width: 14),
 
             // User Name and Status / Phone Number
@@ -244,118 +253,12 @@ class UserTile extends StatelessWidget {
                 isEnabled: onVideoCall != null,
               ),
             ],
-
-            // Contact / User Management Overflow Menu
-            if (!isSelf &&
-                (onToggleFavorite != null ||
-                    onEditContact != null ||
-                    onDeleteContact != null ||
-                    onToggleBlock != null)) ...[
-              const SizedBox(width: 4),
-              PopupMenuButton<String>(
-                icon: const Icon(
-                  Icons.more_vert_rounded,
-                  size: 20,
-                  color: AppTheme.textSecondary,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                onSelected: (action) {
-                  switch (action) {
-                    case 'favorite':
-                      onToggleFavorite?.call();
-                      break;
-                    case 'edit':
-                      onEditContact?.call();
-                      break;
-                    case 'delete':
-                      onDeleteContact?.call();
-                      break;
-                    case 'block':
-                      onToggleBlock?.call();
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  if (onToggleFavorite != null)
-                    PopupMenuItem(
-                      value: 'favorite',
-                      child: Row(
-                        children: [
-                          Icon(
-                            isFavorite
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
-                            size: 20,
-                            color: isFavorite
-                                ? const Color(0xFFF59E0B)
-                                : AppTheme.textSecondary,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(isFavorite
-                              ? 'Remove from Favorites'
-                              : 'Add to Favorites'),
-                        ],
-                      ),
-                    ),
-                  if (onEditContact != null)
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit_outlined,
-                              size: 20, color: AppTheme.textSecondary),
-                          SizedBox(width: 10),
-                          Text('Edit Contact'),
-                        ],
-                      ),
-                    ),
-                  if (onDeleteContact != null)
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_outline_rounded,
-                              size: 20, color: Colors.redAccent),
-                          SizedBox(width: 10),
-                          Text(
-                            'Delete Contact',
-                            style: TextStyle(color: Colors.redAccent),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (onToggleBlock != null)
-                    PopupMenuItem(
-                      value: 'block',
-                      child: Row(
-                        children: [
-                          Icon(
-                            isBlocked
-                                ? Icons.lock_open_rounded
-                                : Icons.block_rounded,
-                            size: 20,
-                            color: isBlocked ? Colors.green : Colors.redAccent,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            isBlocked ? 'Unblock User' : 'Block User',
-                            style: TextStyle(
-                              color:
-                                  isBlocked ? Colors.green : Colors.redAccent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ],
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildAvatarWithStatus(BuildContext context) {

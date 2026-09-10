@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:connect_call/routes/app_pages.dart';
 
 // Mock ContactService for device contacts
 class MockContactService extends ContactService {
@@ -475,7 +476,10 @@ void main() {
 
       Get.put<ContactsController>(controller);
 
-      await tester.pumpWidget(const GetMaterialApp(home: ContactsScreen()));
+      await tester.pumpWidget(GetMaterialApp(
+        home: const ContactsScreen(),
+        getPages: AppPages.pages,
+      ));
       await tester.pumpAndSettle();
 
       // Trigger searched user state
@@ -486,9 +490,10 @@ void main() {
       expect(find.text('Priya Verma'), findsOneWidget);
       expect(find.text('+919988776655'), findsOneWidget);
 
-      // Verify Audio and Video call buttons are rendered
+      // Verify Audio and Video call buttons are rendered, and 3-dots menu is removed
       expect(find.byIcon(Icons.call_rounded), findsOneWidget);
       expect(find.byIcon(Icons.videocam_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
 
       // Tap Audio Call
       await tester.tap(find.byIcon(Icons.call_rounded));
