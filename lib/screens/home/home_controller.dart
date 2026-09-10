@@ -175,12 +175,23 @@ class HomeController extends GetxController {
   void _subscribeToRecentCalls() {
     _recentCallsSubscription?.cancel();
     _recentCallsSubscription =
-        _callHistoryService.getRecentCalls(limit: 5).listen((calls) {
+        _callHistoryService.getCallHistoryStream(limit: 100).listen((calls) {
       recentCalls.assignAll(calls);
       if (favoriteContacts.isEmpty) {
         _computeMostCalled();
       }
     });
+  }
+
+  Future<void> deleteCall(String callId) async {
+    await _callHistoryService.deleteCallRecord(callId);
+  }
+
+  Future<void> clearAllHistory() async {
+    await _callHistoryService.clearAllHistory();
+    recentCalls.clear();
+    mostCalledContacts.clear();
+    mostCalledCounts.clear();
   }
 
   // Ensure current logged-in user document is present in Firestore

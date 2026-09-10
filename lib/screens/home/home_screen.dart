@@ -4,7 +4,6 @@ import '../../core/theme/app_theme.dart';
 import '../../models/favorite_contact_model.dart';
 import '../../models/user_model.dart';
 import '../../widgets/call_history_tile.dart';
-import '../calls/calls_screen.dart';
 import '../contacts/contacts_screen.dart';
 import '../profile/profile_screen.dart';
 import 'home_controller.dart';
@@ -22,7 +21,6 @@ class HomeScreen extends StatelessWidget {
     final List<Widget> tabs = [
       _buildHomeDashboard(context),
       const ContactsScreen(),
-      const CallsScreen(),
       const ProfileScreen(),
     ];
 
@@ -51,11 +49,6 @@ class HomeScreen extends StatelessWidget {
               icon: Icon(Icons.people_outline_rounded),
               selectedIcon: Icon(Icons.people_rounded, color: AppTheme.primaryColor),
               label: 'Contacts',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.call_outlined),
-              selectedIcon: Icon(Icons.call_rounded, color: AppTheme.primaryColor),
-              label: 'Calls',
             ),
             NavigationDestination(
               icon: Icon(Icons.person_outline_rounded),
@@ -89,18 +82,46 @@ class HomeScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSectionTitle('Recent Calls', context),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildSectionTitle('Recent Calls', context),
+                    const SizedBox(width: 8),
+                    Obx(() {
+                      if (controller.recentCalls.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${controller.recentCalls.length}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
                 Obx(() {
                   if (controller.recentCalls.isEmpty) {
                     return const SizedBox.shrink();
                   }
-                  return TextButton(
-                    onPressed: () => controller.changeTab(2),
-                    child: const Text(
-                      'View All',
+                  return TextButton.icon(
+                    onPressed: () => _showClearConfirmation(context, controller),
+                    icon: const Icon(Icons.delete_sweep_rounded, size: 16, color: Colors.redAccent),
+                    label: const Text(
+                      'Clear',
                       style: TextStyle(
-                        color: AppTheme.primaryColor,
+                        color: Colors.redAccent,
                         fontWeight: FontWeight.w600,
+                        fontSize: 13,
                       ),
                     ),
                   );
@@ -594,14 +615,72 @@ class HomeScreen extends StatelessWidget {
           ),
           itemBuilder: (context, index) {
             final call = controller.recentCalls[index];
-            return CallHistoryTile(
-              call: call,
-              currentUserId: controller.currentUid,
-              onRedial: () => controller.redial(call),
-              showBorder: false,
+            return Dismissible(
+              key: Key(call.id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade600,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+              onDismissed: (_) {
+                controller.deleteCall(call.id);
+                Get.snackbar(
+                  'Call Removed',
+                  'Call record deleted from history.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 2),
+                );
+              },
+              child: CallHistoryTile(
+                call: call,
+                currentUserId: controller.currentUid,
+                onRedial: () => controller.redial(call),
+                showBorder: false,
+              ),
             );
           },
         ),
+      ),
+    );
+  }
+
+  void _showClearConfirmation(BuildContext context, HomeController controller) {
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Clear Call History'),
+        content: const Text(
+          'Are you sure you want to clear all call history from this device?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Get.back();
+              controller.clearAllHistory();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Clear All'),
+          ),
+        ],
       ),
     );
   }

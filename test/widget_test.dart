@@ -160,10 +160,9 @@ void main() {
     expect(find.text('Recent Calls'), findsOneWidget);
     expect(find.text('No recent calls'), findsOneWidget);
 
-    // Verify Bottom Navigation tabs
+    // Verify Bottom Navigation tabs (Home, Contacts, Profile)
     expect(find.widgetWithText(NavigationDestination, 'Home'), findsOneWidget);
     expect(find.widgetWithText(NavigationDestination, 'Contacts'), findsOneWidget);
-    expect(find.widgetWithText(NavigationDestination, 'Calls'), findsOneWidget);
     expect(find.widgetWithText(NavigationDestination, 'Profile'), findsOneWidget);
 
     // Tap Contacts Tab
@@ -171,11 +170,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Connect with people'), findsOneWidget);
     expect(find.text('Search contacts or phone number'), findsOneWidget);
-
-    // Tap Calls Tab
-    await tester.tap(find.widgetWithText(NavigationDestination, 'Calls'));
-    await tester.pumpAndSettle();
-    expect(find.text('Call History'), findsOneWidget);
 
     // Tap Profile Tab
     await tester.tap(find.widgetWithText(NavigationDestination, 'Profile'));
