@@ -7,6 +7,7 @@ import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 import '../../core/theme/app_theme.dart';
 import '../../routes/app_routes.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/network_quality_indicator.dart';
 import 'invite_participant_sheet.dart';
 
 /// A custom, modular, voice-only calling overlay rendered on top of ZegoUIKitPrebuiltCall.
@@ -436,23 +437,32 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              widget.isOutgoingRinging
-                  ? 'Calling...'
-                  : _formatDuration(_callDurationSeconds),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.8,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!widget.isOutgoingRinging) ...[
+                const NetworkQualityIndicator(),
+                const SizedBox(width: 8),
+              ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  widget.isOutgoingRinging
+                      ? 'Calling...'
+                      : _formatDuration(_callDurationSeconds),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.8,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),

@@ -16,10 +16,12 @@ import '../routes/app_routes.dart';
 import '../screens/calling/custom_audio_calling_view.dart';
 import '../screens/calling/invite_participant_sheet.dart';
 import '../screens/home/home_controller.dart';
+import '../widgets/network_quality_indicator.dart';
 import 'auth_service.dart';
 import 'block_service.dart';
 import 'call_history_service.dart';
 import 'call_notification_service.dart';
+import 'network_quality_service.dart';
 import 'pending_call_manager.dart';
 import 'user_service.dart';
 
@@ -319,6 +321,7 @@ class ZegoCallService {
           },
           onOutgoingCallAccepted: (callID, callee) async {
             _callConnectedAt ??= DateTime.now();
+            NetworkQualityService.instance.startMonitoring();
             await _callHistoryService.updateCallStatus(
               callId: callID,
               status: 'connected',
@@ -326,6 +329,7 @@ class ZegoCallService {
           },
           onIncomingCallAcceptButtonPressed: () async {
             _callConnectedAt ??= DateTime.now();
+            NetworkQualityService.instance.startMonitoring();
             final targetCallId = activeCallId.value.isNotEmpty
                 ? activeCallId.value
                 : (_currentSessionCallId ?? '');
@@ -337,6 +341,7 @@ class ZegoCallService {
             }
           },
           onOutgoingCallDeclined: (callID, callee, customData) async {
+            NetworkQualityService.instance.stopMonitoring();
             await _callHistoryService.updateCallStatus(
               callId: callID,
               status: 'rejected',
@@ -345,6 +350,7 @@ class ZegoCallService {
             );
           },
           onOutgoingCallRejectedCauseBusy: (callID, callee, customData) async {
+            NetworkQualityService.instance.stopMonitoring();
             await _callHistoryService.updateCallStatus(
               callId: callID,
               status: 'busy',
@@ -353,6 +359,7 @@ class ZegoCallService {
             );
           },
           onIncomingCallDeclineButtonPressed: () async {
+            NetworkQualityService.instance.stopMonitoring();
             final targetCallId = activeCallId.value.isNotEmpty
                 ? activeCallId.value
                 : (_currentSessionCallId ?? '');
@@ -366,6 +373,7 @@ class ZegoCallService {
             }
           },
           onIncomingCallTimeout: (callID, caller) async {
+            NetworkQualityService.instance.stopMonitoring();
             await _callHistoryService.updateCallStatus(
               callId: callID,
               status: 'missed',
@@ -374,6 +382,7 @@ class ZegoCallService {
             );
           },
           onIncomingCallCanceled: (callID, caller, customData) async {
+            NetworkQualityService.instance.stopMonitoring();
             await _callHistoryService.updateCallStatus(
               callId: callID,
               status: 'missed',
@@ -382,6 +391,7 @@ class ZegoCallService {
             );
           },
           onOutgoingCallTimeout: (callID, callees, isVideoCall) async {
+            NetworkQualityService.instance.stopMonitoring();
             await _callHistoryService.updateCallStatus(
               callId: callID,
               status: 'missed',
@@ -390,6 +400,7 @@ class ZegoCallService {
             );
           },
           onOutgoingCallCancelButtonPressed: () async {
+            NetworkQualityService.instance.stopMonitoring();
             final targetCallId = activeCallId.value.isNotEmpty
                 ? activeCallId.value
                 : (_currentSessionCallId ?? '');
@@ -410,6 +421,7 @@ class ZegoCallService {
         events: ZegoUIKitPrebuiltCallEvents(
           onCallEnd: (ZegoCallEndEvent event, VoidCallback defaultAction) async {
             debugPrint('ZegoCallService onCallEnd: ${event.reason}');
+            NetworkQualityService.instance.stopMonitoring();
 
             final endCallId = activeCallId.value.isNotEmpty
                 ? activeCallId.value
@@ -480,6 +492,7 @@ class ZegoCallService {
         requireConfig: (ZegoCallInvitationData data) {
           activeCallId.value = data.callID;
           _callConnectedAt ??= DateTime.now();
+          NetworkQualityService.instance.startMonitoring();
           if (data.callID.isNotEmpty) {
             _callHistoryService.updateCallStatus(
               callId: data.callID,
@@ -514,6 +527,19 @@ class ZegoCallService {
                 smallViewPosition: ZegoViewPosition.topRight,
               );
             }
+
+            // Real-time Network Quality Indicator overlay (non-blocking pass-through)
+            config.foreground = const SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: EdgeInsets.only(top: 60, right: 16),
+                  child: IgnorePointer(
+                    child: NetworkQualityIndicator(),
+                  ),
+                ),
+              ),
+            );
 
             // In-call invite button in top bar to add more participants into conference
             config.topMenuBar.extendButtons = [
@@ -583,6 +609,7 @@ class ZegoCallService {
   /// Deinitialize ZEGOCLOUD Call Invitation Service upon user logout
   Future<void> uninit() async {
     try {
+      NetworkQualityService.instance.stopMonitoring();
       if (isInitialized.value) {
         await ZegoUIKitPrebuiltCallInvitationService().uninit();
         debugPrint('ZegoCallService uninitialized successfully.');
