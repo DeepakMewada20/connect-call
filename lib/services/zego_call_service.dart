@@ -338,9 +338,10 @@ class ZegoCallService {
               return;
             }
 
-            // If another call is already underway, reject new incoming call as busy
-            if (activeCallId.value.isNotEmpty && activeCallId.value != callID) {
-              debugPrint('[ZegoCallService] Another call is active (${activeCallId.value}). Rejecting $callID as busy.');
+            // If another call is already actively connected in a room, reject new incoming call as busy
+            final isRoomActive = ZegoUIKit().getRoom().id.isNotEmpty && _callConnectedAt != null;
+            if (isRoomActive && activeCallId.value != callID) {
+              debugPrint('[ZegoCallService] Live room is currently connected (${ZegoUIKit().getRoom().id}). Rejecting incoming call $callID as busy.');
               try {
                 await ZegoUIKitPrebuiltCallInvitationService().reject();
               } catch (_) {}
@@ -561,8 +562,9 @@ class ZegoCallService {
                 : (_currentSessionCallId ?? ZegoUIKit().getRoom().id);
 
             int duration = 0;
-            if (_callConnectedAt != null) {
-              duration = DateTime.now().difference(_callConnectedAt!).inSeconds;
+            final connectedAt = _callConnectedAt;
+            if (connectedAt != null) {
+              duration = DateTime.now().difference(connectedAt).inSeconds;
               if (duration < 0) duration = 0;
             }
 
@@ -590,32 +592,9 @@ class ZegoCallService {
               debugPrint('defaultAction error: $e');
             }
 
-            // Cleanly pop any residual invitation / calling pages (e.g. ZegoCallingPage)
-            // back to the root HomeScreen to prevent blank/black screens on call termination.
-            void returnToHomeSafely() {
-              // Guard: Do not unwind navigation if a call is currently connecting or active
-              if (activeCallId.value.isNotEmpty || isCalling.value) {
-                return;
-              }
-              try {
-                final nav = navigatorKey.currentState ?? Get.key.currentState;
-                if (nav != null && nav.canPop()) {
-                  // Only unwind intermediate calling and modal dialog routes back to root HomeScreen
-                  nav.popUntil((route) => route.isFirst);
-                }
-              } catch (e) {
-                debugPrint('nav popUntil error: $e');
-              }
-
-              // Ensure HomeController is alive
-              if (!Get.isRegistered<HomeController>()) {
-                Get.put(HomeController(), permanent: true);
-              }
+            if (!Get.isRegistered<HomeController>()) {
+              Get.put(HomeController(), permanent: true);
             }
-
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              returnToHomeSafely();
-            });
           },
         ),
         requireConfig: (ZegoCallInvitationData data) {
@@ -2074,8 +2053,9 @@ class ZegoCallService {
         : (_currentSessionCallId ?? ZegoUIKit().getRoom().id);
 
     int duration = 0;
-    if (_callConnectedAt != null) {
-      duration = DateTime.now().difference(_callConnectedAt!).inSeconds;
+    final connectedAt = _callConnectedAt;
+    if (connectedAt != null) {
+      duration = DateTime.now().difference(connectedAt).inSeconds;
       if (duration < 0) duration = 0;
     }
 
@@ -2110,17 +2090,8 @@ class ZegoCallService {
       defaultAction();
     } catch (_) {}
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      try {
-        final nav = navigatorKey.currentState ?? Get.key.currentState;
-        if (nav != null && nav.canPop()) {
-          nav.popUntil((route) => route.isFirst);
-        }
-      } catch (_) {}
-
-      if (!Get.isRegistered<HomeController>()) {
-        Get.put(HomeController(), permanent: true);
-      }
-    });
+    if (!Get.isRegistered<HomeController>()) {
+      Get.put(HomeController(), permanent: true);
+    }
   }
 }

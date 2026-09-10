@@ -247,11 +247,13 @@ class HomeController extends GetxController {
   // User display name with safe fallback
   String get userName {
     final user = _authService.getCurrentUser();
-    if (user?.displayName != null && user!.displayName!.trim().isNotEmpty) {
-      return user.displayName!.trim();
+    final displayName = user?.displayName;
+    if (displayName != null && displayName.trim().isNotEmpty) {
+      return displayName.trim();
     }
-    if (user?.phoneNumber != null && user!.phoneNumber!.isNotEmpty) {
-      return user.phoneNumber!;
+    final phone = user?.phoneNumber;
+    if (phone != null && phone.isNotEmpty) {
+      return phone;
     }
     return 'User';
   }
