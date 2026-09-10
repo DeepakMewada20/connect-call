@@ -68,8 +68,8 @@ class SplashController extends GetxController {
             final pendingCall = await PendingCallManager.instance.getPendingCall();
             final launchAction = PendingCallManager.instance.launchAction;
 
-            if (pendingCall != null && !pendingCall.isExpired) {
-              debugPrint('[SPLASH] Incoming call detected on launch: ${pendingCall.callId}, action: $launchAction');
+            if (pendingCall != null && !pendingCall.isExpired && launchAction != null) {
+              debugPrint('[SPLASH] Incoming call notification launch detected: ${pendingCall.callId}, action: $launchAction');
 
               // 1. Ensure ZEGOCLOUD Call Service is initialized and connected to ZIM
               if (!ZegoCallService.instance.isInitialized.value) {
@@ -108,6 +108,9 @@ class SplashController extends GetxController {
               return;
             }
 
+            // Normal app launch (e.g. user tapped app icon from launcher, not from notification)
+            // Clear any stale pending call data so phantom dialogs are never shown
+            await PendingCallManager.instance.clearPendingCall();
             Get.offAllNamed(AppRoutes.home);
           } else {
             Get.offAllNamed(

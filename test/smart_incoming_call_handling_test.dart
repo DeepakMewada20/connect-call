@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:connect_call/models/pending_call_model.dart';
 import 'package:connect_call/screens/calling/incoming_call_decision_dialog.dart';
 import 'package:connect_call/services/call_notification_service.dart';
-import 'package:connect_call/services/pending_call_manager.dart';
 import 'package:connect_call/services/zego_call_service.dart';
 
 void main() {

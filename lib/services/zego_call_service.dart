@@ -229,6 +229,15 @@ class ZegoCallService {
                           .map((u) => ZegoCallUser(u.id, u.name))
                           .toList(),
                     );
+                    final callIdToCancel = activeCallId.value.isNotEmpty
+                        ? activeCallId.value
+                        : (_currentSessionCallId ?? '');
+                    if (info.invitees.isNotEmpty && callIdToCancel.isNotEmpty) {
+                      _dispatchFcmCallCancel(
+                        receiverUid: info.invitees.first.id,
+                        callId: callIdToCancel,
+                      );
+                    }
                   } catch (e) {
                     debugPrint('Error canceling outgoing call: $e');
                   }
@@ -631,12 +640,18 @@ class ZegoCallService {
             config.turnOnMicrophoneWhenJoining = true;
             config.useSpeakerWhenJoining = true;
 
-            // Use gallery layout for all video calls to ensure full screen sharing stream rendering
-            config.layout = ZegoLayout.gallery(
-              showNewScreenSharingViewInFullscreenMode: true,
-              showScreenSharingFullscreenModeToggleButtonRules:
-                  ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
-            );
+            // In 1-on-1 video call, Picture-in-Picture layout displays the remote user fullscreen
+            // with local preview in a corner, avoiding black screen tile issues in gallery layout
+            config.layout = isGroup
+                ? ZegoLayout.gallery(
+                    showNewScreenSharingViewInFullscreenMode: true,
+                    showScreenSharingFullscreenModeToggleButtonRules:
+                        ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
+                  )
+                : ZegoLayout.pictureInPicture(
+                    isSmallViewDraggable: true,
+                    switchLargeOrSmallViewByClick: true,
+                  );
 
             // Screen Sharing configuration
             config.screenSharing = ZegoCallScreenSharingConfig(
@@ -1867,6 +1882,28 @@ class ZegoCallService {
       return;
     }
 
+    if (!acceptedByZego && !Get.testMode) {
+      debugPrint('[CALL PUSH] Call invitation is no longer active or was cancelled by caller. Aborting room entry.');
+      await _callHistoryService.updateCallStatus(
+        callId: call.callId,
+        status: 'missed',
+        endedAt: DateTime.now(),
+        durationSeconds: 0,
+      );
+      activeCallId.value = '';
+      _currentSessionCallId = null;
+      _callConnectedAt = null;
+      Get.snackbar(
+        'Call Ended',
+        'The caller has already ended this call.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.blueGrey.shade800,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+
     // Ensure we transition from splash to home so the call page has a stable parent route
     if (Get.currentRoute == AppRoutes.splash || Get.currentRoute.isEmpty) {
       Get.offAllNamed(AppRoutes.home);
@@ -1881,11 +1918,14 @@ class ZegoCallService {
         config.turnOnCameraWhenJoining = true;
         config.turnOnMicrophoneWhenJoining = true;
         config.useSpeakerWhenJoining = true;
-        config.layout = ZegoLayout.gallery(
-          showNewScreenSharingViewInFullscreenMode: true,
-          showScreenSharingFullscreenModeToggleButtonRules:
-              ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
+        config.layout = ZegoLayout.pictureInPicture(
+          isSmallViewDraggable: true,
+          switchLargeOrSmallViewByClick: true,
         );
+        config.audioVideoView.useVideoViewAspectFill = true;
+        config.audioVideoView.showCameraStateOnView = true;
+        config.audioVideoView.showMicrophoneStateOnView = true;
+        config.audioVideoView.showUserNameOnView = true;
         config.screenSharing = ZegoCallScreenSharingConfig(
           defaultFullScreen: true,
         );
