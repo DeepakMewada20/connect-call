@@ -133,6 +133,7 @@ class ContactsController extends GetxController {
       // 1. Read contacts from local device and store deviceContacts
       final rawContacts = await _contactService.getContacts();
       deviceContacts.assignAll(rawContacts);
+      _contactService.updateCacheFromContacts(rawContacts);
 
       final deviceNumbers = await _contactService.getNormalizedPhoneNumbers();
 
@@ -341,7 +342,7 @@ class ContactsController extends GetxController {
     remoteSearchError.value = '';
   }
 
-  // Case-insensitive client-side filtered users by name or phone number
+  // Case-insensitive client-side filtered users by display name, registered name, or phone number
   List<UserModel> get filteredUsers {
     final query = searchQuery.value.trim().toLowerCase();
     if (query.isEmpty) {
@@ -349,9 +350,11 @@ class ContactsController extends GetxController {
     }
 
     return users.where((user) {
+      final displayName = getDisplayNameForUser(user).toLowerCase();
+      final matchesDisplayName = displayName.contains(query);
       final matchesName = user.name.toLowerCase().contains(query);
       final matchesPhone = user.phoneNumber.toLowerCase().contains(query);
-      return matchesName || matchesPhone;
+      return matchesDisplayName || matchesName || matchesPhone;
     }).toList();
   }
 
@@ -366,6 +369,20 @@ class ContactsController extends GetxController {
   }
 
   // --- Phase 5: Device Contact Management & Linkage ---
+
+  /// Resolves display name according to the two requirements:
+  /// 1. If saved in mobile contacts -> returns saved name
+  /// 2. If not saved in mobile contacts -> returns registered profile name
+  String getDisplayNameForUser(UserModel user) {
+    final dc = findDeviceContactForUser(user);
+    if (dc != null && dc.displayName.trim().isNotEmpty) {
+      return dc.displayName.trim();
+    }
+    if (user.name.trim().isNotEmpty) {
+      return user.name.trim();
+    }
+    return PhoneNumberUtil.formatForDisplay(user.phoneNumber);
+  }
 
   /// Finds the corresponding device contact for a given registered user, if any
   DeviceContact? findDeviceContactForUser(UserModel user) {

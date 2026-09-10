@@ -89,36 +89,182 @@ class ProfileController extends GetxController {
     }
   }
 
-  // Display confirmation dialog before logging out
-  void showLogoutConfirmation() {
-    final isDark = Get.isDarkMode;
-    Get.defaultDialog(
-      title: 'Logout',
-      titleStyle: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+  // Display custom styled confirmation dialog before logging out
+  void showLogoutConfirmation([BuildContext? context]) {
+    final ctx = context ?? Get.context;
+    final isDark = ctx != null ? AppTheme.isDarkMode(ctx) : Get.isDarkMode;
+    final surfaceColor = ctx != null
+        ? AppTheme.surfaceColorOf(ctx)
+        : (isDark ? AppTheme.darkSurfaceColor : AppTheme.surfaceColor);
+    final textPrimary = ctx != null
+        ? AppTheme.textPrimaryOf(ctx)
+        : (isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary);
+    final textSecondary = ctx != null
+        ? AppTheme.textSecondaryOf(ctx)
+        : (isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary);
+    final dividerColor = ctx != null
+        ? AppTheme.dividerColorOf(ctx)
+        : (isDark ? AppTheme.darkDividerColor : AppTheme.dividerColor);
+
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 360),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: dividerColor.withValues(alpha: isDark ? 0.6 : 0.4),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 26),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Top circular logout badge with double ring
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: isDark ? 0.16 : 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: isDark ? 0.24 : 0.14),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.logout_rounded,
+                      color: Color(0xFFEF4444),
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Title
+              Text(
+                'Logout',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Confirmation question
+              Text(
+                'Are you sure you want to logout?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // Friendly explanation
+              Text(
+                'You will be signed out on this device and need to verify your phone number to sign back in.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: textSecondary.withValues(alpha: 0.8),
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Action buttons row (Cancel & Logout)
+              Row(
+                children: [
+                  // Cancel button
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Get.back(),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        side: BorderSide(
+                          color: dividerColor.withValues(alpha: 0.8),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        backgroundColor: isDark
+                            ? Colors.white.withValues(alpha: 0.04)
+                            : Colors.grey.shade50,
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Confirm Logout button
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Get.back();
+                        logout();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFEF4444),
+                        foregroundColor: Colors.white,
+                        elevation: 1,
+                        shadowColor: Colors.red.withValues(alpha: 0.35),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.logout_rounded, size: 17),
+                          SizedBox(width: 6),
+                          Text(
+                            'Logout',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
-      middleText: 'Are you sure you want to logout?',
-      middleTextStyle: TextStyle(
-        fontSize: 14,
-        color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
-      ),
-      backgroundColor: isDark ? AppTheme.darkSurfaceColor : AppTheme.surfaceColor,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      radius: 16,
-      textConfirm: 'Logout',
-      confirmTextColor: Colors.white,
-      buttonColor: Colors.red.shade600,
-      textCancel: 'Cancel',
-      cancelTextColor: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
-      onCancel: () {
-        Get.back();
-      },
-      onConfirm: () {
-        Get.back(); // Dismiss dialog
-        logout();
-      },
+      barrierDismissible: true,
     );
   }
 

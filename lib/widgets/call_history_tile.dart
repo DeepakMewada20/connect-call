@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../models/call_model.dart';
 import '../services/auth_service.dart';
+import '../services/contact_service.dart';
 
 /// CallHistoryTile renders a single call record item in the Call History list.
 class CallHistoryTile extends StatelessWidget {
@@ -29,7 +30,12 @@ class CallHistoryTile extends StatelessWidget {
     final dividerColor = AppTheme.dividerColorOf(context);
 
     final effectiveUid = currentUserId ?? AuthService().currentUserId;
-    final otherName = call.getOtherUserName(effectiveUid);
+    final otherRegisteredName = call.getOtherUserName(effectiveUid);
+    final otherName = ContactService.instance.resolveDisplayName(
+      phoneNumber: call.phoneNumber,
+      registeredName: otherRegisteredName,
+      fallback: otherRegisteredName,
+    );
     final otherPhoto = call.getOtherUserPhoto(effectiveUid);
     final initial = otherName.isNotEmpty ? otherName[0].toUpperCase() : 'U';
 

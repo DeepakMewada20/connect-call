@@ -401,7 +401,7 @@ class ProfileScreen extends StatelessWidget {
             ListTile(
               onTap: controller.isLoggingOut.value
                   ? null
-                  : controller.showLogoutConfirmation,
+                  : () => controller.showLogoutConfirmation(context),
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
               leading: Container(

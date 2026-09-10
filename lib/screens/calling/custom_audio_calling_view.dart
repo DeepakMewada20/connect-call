@@ -7,6 +7,8 @@ import 'package:zego_uikit_prebuilt_call/zego_uikit_prebuilt_call.dart';
 import '../../core/theme/app_theme.dart';
 import '../../routes/app_routes.dart';
 import '../../services/auth_service.dart';
+import '../../services/contact_service.dart';
+import '../../services/zego_call_service.dart';
 import '../../widgets/network_quality_indicator.dart';
 import 'invite_participant_sheet.dart';
 
@@ -286,61 +288,73 @@ class _CustomAudioCallingViewState extends State<CustomAudioCallingView>
 
   @override
   Widget build(BuildContext context) {
-    // Resolve remote user display name from room users, callingInfo, or callData
+    // Resolve remote user display name from session, room users, callingInfo, or callData
     String remoteUserName = 'Connected User';
     final currentUid = AuthService().currentUserId ?? ZegoUIKit().getLocalUser().id;
 
-    // 1. Check active remote users in room first
-    final remoteUsers = ZegoUIKit().getRemoteUsers();
-    if (remoteUsers.isNotEmpty) {
-      final validRemote = remoteUsers.firstWhere(
-        (u) => u.id != currentUid,
-        orElse: () => remoteUsers.first,
-      );
-      if (validRemote.name.trim().isNotEmpty) {
-        remoteUserName = validRemote.name.trim();
-      } else if (validRemote.id.trim().isNotEmpty) {
-        remoteUserName = validRemote.id.trim();
+    final sessionTargetName = ZegoCallService.instance.currentSessionTargetName;
+    if (sessionTargetName != null &&
+        sessionTargetName.isNotEmpty &&
+        sessionTargetName != 'User') {
+      remoteUserName = sessionTargetName;
+    } else {
+      // 1. Check active remote users in room first
+      final remoteUsers = ZegoUIKit().getRemoteUsers();
+      if (remoteUsers.isNotEmpty) {
+        final validRemote = remoteUsers.firstWhere(
+          (u) => u.id != currentUid,
+          orElse: () => remoteUsers.first,
+        );
+        if (validRemote.name.trim().isNotEmpty) {
+          remoteUserName = validRemote.name.trim();
+        } else if (validRemote.id.trim().isNotEmpty) {
+          remoteUserName = validRemote.id.trim();
+        }
       }
-    }
 
-    // 2. If not in active room yet (e.g. ringing/connecting), resolve relative to currentUid
-    if (remoteUserName == 'Connected User') {
-      if (widget.callingInfo != null) {
-        final inviter = widget.callingInfo!.inviter;
-        final invitees = widget.callingInfo!.invitees;
-        if (inviter.id == currentUid && invitees.isNotEmpty) {
-          // Current user is caller -> other participant is invitee
-          remoteUserName = invitees.first.name.trim().isNotEmpty
-              ? invitees.first.name.trim()
-              : invitees.first.id;
-        } else {
-          // Current user is callee -> other participant is inviter
-          remoteUserName = inviter.name.trim().isNotEmpty
-              ? inviter.name.trim()
-              : inviter.id;
+      // 2. If not in active room yet (e.g. ringing/connecting), resolve relative to currentUid
+      if (remoteUserName == 'Connected User') {
+        if (widget.callingInfo != null) {
+          final inviter = widget.callingInfo!.inviter;
+          final invitees = widget.callingInfo!.invitees;
+          if (inviter.id == currentUid && invitees.isNotEmpty) {
+            // Current user is caller -> other participant is invitee
+            remoteUserName = invitees.first.name.trim().isNotEmpty
+                ? invitees.first.name.trim()
+                : invitees.first.id;
+          } else {
+            // Current user is callee -> other participant is inviter
+            remoteUserName = inviter.name.trim().isNotEmpty
+                ? inviter.name.trim()
+                : inviter.id;
+          }
+        } else if (widget.callData != null) {
+          final inviter = widget.callData!.inviter;
+          final invitees = widget.callData!.invitees;
+          if (inviter != null && inviter.id == currentUid && invitees.isNotEmpty) {
+            // Current user is caller -> other participant is invitee
+            remoteUserName = invitees.first.name.trim().isNotEmpty
+                ? invitees.first.name.trim()
+                : invitees.first.id;
+          } else if (inviter != null && inviter.id != currentUid) {
+            // Current user is callee -> other participant is inviter
+            remoteUserName = inviter.name.trim().isNotEmpty
+                ? inviter.name.trim()
+                : inviter.id;
+          } else if (invitees.isNotEmpty) {
+            final other = invitees.firstWhere(
+              (u) => u.id != currentUid,
+              orElse: () => invitees.first,
+            );
+            remoteUserName =
+                other.name.trim().isNotEmpty ? other.name.trim() : other.id;
+          }
         }
-      } else if (widget.callData != null) {
-        final inviter = widget.callData!.inviter;
-        final invitees = widget.callData!.invitees;
-        if (inviter != null && inviter.id == currentUid && invitees.isNotEmpty) {
-          // Current user is caller -> other participant is invitee
-          remoteUserName = invitees.first.name.trim().isNotEmpty
-              ? invitees.first.name.trim()
-              : invitees.first.id;
-        } else if (inviter != null && inviter.id != currentUid) {
-          // Current user is callee -> other participant is inviter
-          remoteUserName = inviter.name.trim().isNotEmpty
-              ? inviter.name.trim()
-              : inviter.id;
-        } else if (invitees.isNotEmpty) {
-          final other = invitees.firstWhere(
-            (u) => u.id != currentUid,
-            orElse: () => invitees.first,
-          );
-          remoteUserName =
-              other.name.trim().isNotEmpty ? other.name.trim() : other.id;
-        }
+      }
+
+      final savedContact = ContactService.instance.getSavedContactName(remoteUserName);
+      if (savedContact != null && savedContact.trim().isNotEmpty) {
+        remoteUserName = savedContact.trim();
       }
     }
 

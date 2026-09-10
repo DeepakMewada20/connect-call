@@ -513,9 +513,11 @@ class ContactsScreen extends StatelessWidget {
           final isFav = controller.isFavorite(user.uid);
           final isBlk = controller.isBlocked(user.uid);
           final deviceContact = controller.findDeviceContactForUser(user);
+          final displayName = controller.getDisplayNameForUser(user);
 
           return UserTile(
             user: user,
+            displayName: displayName,
             isFavorite: isFav,
             isBlocked: isBlk,
             onAudioCall: () => controller.onAudioCallTap(user),
@@ -686,6 +688,7 @@ class ContactsScreen extends StatelessWidget {
     final isFav = controller.isFavorite(user.uid);
     final isBlk = controller.isBlocked(user.uid);
     final deviceContact = controller.findDeviceContactForUser(user);
+    final displayName = controller.getDisplayNameForUser(user);
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -705,6 +708,7 @@ class ContactsScreen extends StatelessWidget {
         ),
         UserTile(
           user: user,
+          displayName: displayName,
           isSelf: controller.isSelfNumberSearched.value,
           badgeText: controller.isSelfNumberSearched.value ? null : 'Registered User',
           isFavorite: isFav,

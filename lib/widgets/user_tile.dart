@@ -4,6 +4,7 @@ import '../models/user_model.dart';
 
 class UserTile extends StatelessWidget {
   final UserModel user;
+  final String? displayName;
   final VoidCallback? onAudioCall;
   final VoidCallback? onVideoCall;
   final bool isSelf;
@@ -18,6 +19,7 @@ class UserTile extends StatelessWidget {
   const UserTile({
     super.key,
     required this.user,
+    this.displayName,
     this.onAudioCall,
     this.onVideoCall,
     this.isSelf = false,
@@ -32,6 +34,10 @@ class UserTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final resolvedTitle = (displayName != null && displayName!.trim().isNotEmpty)
+        ? displayName!.trim()
+        : (user.name.isNotEmpty ? user.name : 'Unknown User');
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
@@ -64,7 +70,7 @@ class UserTile extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          user.name.isNotEmpty ? user.name : 'Unknown User',
+                          resolvedTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -157,7 +163,11 @@ class UserTile extends StatelessWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            user.phoneNumber,
+                            (displayName != null &&
+                                    displayName!.trim() != user.name.trim() &&
+                                    user.name.trim().isNotEmpty)
+                                ? '${user.phoneNumber} (~${user.name})'
+                                : user.phoneNumber,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -344,8 +354,11 @@ class UserTile extends StatelessWidget {
   }
 
   Widget _buildAvatarWithStatus(BuildContext context) {
+    final nameForInitial = (displayName != null && displayName!.trim().isNotEmpty)
+        ? displayName!.trim()
+        : user.name;
     final String initial =
-        user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U';
+        nameForInitial.isNotEmpty ? nameForInitial[0].toUpperCase() : 'U';
     final bool hasImage = user.profileImage.trim().isNotEmpty;
 
     return Stack(

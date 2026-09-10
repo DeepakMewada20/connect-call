@@ -21,6 +21,7 @@ import 'auth_service.dart';
 import 'block_service.dart';
 import 'call_history_service.dart';
 import 'call_notification_service.dart';
+import 'contact_service.dart';
 import 'network_quality_service.dart';
 import 'pending_call_manager.dart';
 import 'user_service.dart';
@@ -82,6 +83,9 @@ class ZegoCallService {
   String? _currentSessionTargetUid;
   String? _currentSessionTargetName;
   String? _currentSessionTargetPhoto;
+
+  /// Public getter for current session target name
+  String? get currentSessionTargetName => _currentSessionTargetName;
 
   /// Request a secure temporary session token from the Firebase Cloud Function
   Future<ZegoTokenResponse> getZegoToken() async {
@@ -298,7 +302,26 @@ class ZegoCallService {
             _currentSessionIsVideo = callType == ZegoCallInvitationType.videoCall;
 
             _currentSessionTargetUid = caller.id;
-            _currentSessionTargetName = caller.name.isNotEmpty ? caller.name : 'User';
+
+            String resolvedCallerName = caller.name.isNotEmpty ? caller.name : 'User';
+            String? callerPhone;
+            if (customData.isNotEmpty) {
+              try {
+                final data = jsonDecode(customData) as Map<String, dynamic>;
+                callerPhone = data['callerPhone'] as String?;
+              } catch (_) {}
+            }
+            if (callerPhone == null || callerPhone.isEmpty) {
+              final callerProfile = await _userService.getUser(caller.id);
+              callerPhone = callerProfile?.phoneNumber;
+            }
+            resolvedCallerName = ContactService.instance.resolveDisplayName(
+              phoneNumber: callerPhone,
+              registeredName: resolvedCallerName,
+              fallback: resolvedCallerName,
+            );
+
+            _currentSessionTargetName = resolvedCallerName;
 
             final currentUid = _authService.currentUserId ?? '';
             final currentName = _authService.getCurrentUser()?.displayName ?? 'User';
@@ -307,7 +330,8 @@ class ZegoCallService {
               CallModel(
                 id: callID,
                 callerId: caller.id,
-                callerName: caller.name.isNotEmpty ? caller.name : 'User',
+                callerName: resolvedCallerName,
+                phoneNumber: callerPhone,
                 calleeId: currentUid,
                 calleeName: currentName,
                 calleePhoto: _authService.getCurrentUser()?.photoURL,
@@ -797,9 +821,13 @@ class ZegoCallService {
     }
 
     isCalling.value = true;
-    final inviteeName =
-        targetUser.name.isNotEmpty ? targetUser.name : 'User';
+    final inviteeName = ContactService.instance.resolveDisplayName(
+      phoneNumber: targetUser.phoneNumber,
+      registeredName: targetUser.name,
+      fallback: 'User',
+    );
     final currentName = _authService.getCurrentUser()?.displayName ?? 'User';
+    final currentPhone = _authService.currentUser?.phoneNumber ?? '';
     final callID = 'call_${currentUid}_${DateTime.now().millisecondsSinceEpoch}';
     _currentSessionCallId = callID;
     activeCallId.value = callID;
@@ -821,6 +849,7 @@ class ZegoCallService {
           calleeId: targetUser.uid,
           calleeName: inviteeName,
           calleePhoto: _currentSessionTargetPhoto,
+          phoneNumber: targetUser.phoneNumber,
           callType: 'audio',
           direction: 'outgoing',
           status: 'calling',
@@ -829,11 +858,17 @@ class ZegoCallService {
         ),
       );
 
+      final customPayload = jsonEncode({
+        'callerPhone': currentPhone,
+        'callerName': currentName,
+      });
+
       final bool sent = await ZegoUIKitPrebuiltCallInvitationService().send(
         invitees: [
           ZegoCallUser(targetUser.uid, inviteeName),
         ],
         isVideoCall: false, // Strict Phase 6 Requirement: AUDIO ONLY
+        customData: customPayload,
         callID: callID,
         timeoutSeconds: 60,
       );
@@ -983,9 +1018,13 @@ class ZegoCallService {
     }
 
     isCalling.value = true;
-    final inviteeName =
-        targetUser.name.isNotEmpty ? targetUser.name : 'User';
+    final inviteeName = ContactService.instance.resolveDisplayName(
+      phoneNumber: targetUser.phoneNumber,
+      registeredName: targetUser.name,
+      fallback: 'User',
+    );
     final currentName = _authService.getCurrentUser()?.displayName ?? 'User';
+    final currentPhone = _authService.currentUser?.phoneNumber ?? '';
     final callID = 'call_${currentUid}_${DateTime.now().millisecondsSinceEpoch}';
     _currentSessionCallId = callID;
     activeCallId.value = callID;
@@ -1007,6 +1046,7 @@ class ZegoCallService {
           calleeId: targetUser.uid,
           calleeName: inviteeName,
           calleePhoto: _currentSessionTargetPhoto,
+          phoneNumber: targetUser.phoneNumber,
           callType: 'video',
           direction: 'outgoing',
           status: 'calling',
@@ -1015,11 +1055,17 @@ class ZegoCallService {
         ),
       );
 
+      final customPayload = jsonEncode({
+        'callerPhone': currentPhone,
+        'callerName': currentName,
+      });
+
       final bool sent = await ZegoUIKitPrebuiltCallInvitationService().send(
         invitees: [
           ZegoCallUser(targetUser.uid, inviteeName),
         ],
         isVideoCall: true, // Strict Phase 7 Requirement: VIDEO CALL
+        customData: customPayload,
         callID: callID,
         timeoutSeconds: 60,
       );

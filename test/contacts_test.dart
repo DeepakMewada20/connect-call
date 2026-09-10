@@ -652,9 +652,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Displays registered user name
-      expect(find.text('Rahul Sharma'), findsOneWidget);
-      expect(find.text('+919876543210'), findsOneWidget);
+      // Displays saved device contact name as title and registered name in subtitle
+      expect(find.text('Rahul Contact'), findsOneWidget);
+      expect(find.textContaining('Rahul Sharma'), findsOneWidget);
 
       // Tap audio call
       await tester.tap(find.byIcon(Icons.call_rounded));
