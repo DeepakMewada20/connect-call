@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import '../models/pending_call_model.dart';
 import '../routes/app_routes.dart';
 import '../screens/calling/custom_audio_calling_view.dart';
 import '../screens/calling/invite_participant_sheet.dart';
+import '../screens/calling/screen_sharing_indicator.dart';
 import '../screens/home/home_controller.dart';
 import '../widgets/network_quality_indicator.dart';
 import 'auth_service.dart';
@@ -73,6 +75,8 @@ class ZegoCallService {
   final RxBool isInitialized = false.obs;
   final RxBool isCalling = false.obs;
   final RxString activeCallId = ''.obs;
+  final RxBool isScreenSharing = false.obs;
+  StreamSubscription? _screenCaptureErrorSubscription;
 
   String? _initializedUserId;
 
@@ -447,6 +451,14 @@ class ZegoCallService {
             debugPrint('ZegoCallService onCallEnd: ${event.reason}');
             NetworkQualityService.instance.stopMonitoring();
 
+            // Ensure screen sharing is cleanly stopped and state reset on call termination
+            if (isScreenSharing.value || ZegoUIKit().getScreenSharingStateNotifier().value) {
+              try {
+                await ZegoUIKit().stopSharingScreen();
+              } catch (_) {}
+            }
+            isScreenSharing.value = false;
+
             final endCallId = activeCallId.value.isNotEmpty
                 ? activeCallId.value
                 : (_currentSessionCallId ?? ZegoUIKit().getRoom().id);
@@ -552,17 +564,27 @@ class ZegoCallService {
               );
             }
 
-            // Real-time Network Quality Indicator overlay (non-blocking pass-through)
-            config.foreground = const SafeArea(
-              child: Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: EdgeInsets.only(top: 60, right: 16),
-                  child: IgnorePointer(
-                    child: NetworkQualityIndicator(),
+            // Screen Sharing configuration
+            config.screenSharing = ZegoCallScreenSharingConfig(
+              defaultFullScreen: true,
+            );
+
+            // Real-time Network Quality Indicator overlay + Screen Sharing active indicator
+            config.foreground = const Stack(
+              children: [
+                SafeArea(
+                  child: Align(
+                    alignment: Alignment.topRight,
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 60, right: 16),
+                      child: IgnorePointer(
+                        child: NetworkQualityIndicator(),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                ScreenSharingIndicator(),
+              ],
             );
 
             // In-call invite button in top bar to add more participants into conference
@@ -585,11 +607,13 @@ class ZegoCallService {
               ),
             ];
 
+            config.bottomMenuBar.maxCount = 5;
             config.bottomMenuBar.buttons = [
-              ZegoCallMenuBarButtonName.toggleCameraButton,
-              ZegoCallMenuBarButtonName.switchCameraButton,
-              ZegoCallMenuBarButtonName.hangUpButton,
               ZegoCallMenuBarButtonName.toggleMicrophoneButton,
+              ZegoCallMenuBarButtonName.toggleCameraButton,
+              ZegoCallMenuBarButtonName.toggleScreenSharingButton,
+              ZegoCallMenuBarButtonName.hangUpButton,
+              ZegoCallMenuBarButtonName.switchCameraButton,
               ZegoCallMenuBarButtonName.switchAudioOutputButton,
               ZegoCallMenuBarButtonName.showMemberListButton,
             ];
@@ -618,6 +642,16 @@ class ZegoCallService {
         },
       );
 
+      // Register screen sharing state and error listeners
+      try {
+        ZegoUIKit().getScreenSharingStateNotifier().removeListener(_onScreenSharingStateChanged);
+        ZegoUIKit().getScreenSharingStateNotifier().addListener(_onScreenSharingStateChanged);
+        _screenCaptureErrorSubscription?.cancel();
+        _screenCaptureErrorSubscription = ZegoUIKit().getErrorStream().listen(_onZegoErrorReceived);
+      } catch (e) {
+        debugPrint('[ZegoCallService] Screen sharing listener registration error: $e');
+      }
+
       _initializedUserId = currentUser.uid;
       isInitialized.value = true;
       debugPrint('ZegoCallService initialized successfully for UID: ${currentUser.uid}');
@@ -634,6 +668,19 @@ class ZegoCallService {
   Future<void> uninit() async {
     try {
       NetworkQualityService.instance.stopMonitoring();
+      if (!Get.testMode && (isScreenSharing.value || ZegoUIKit().getScreenSharingStateNotifier().value)) {
+        try {
+          await ZegoUIKit().stopSharingScreen();
+        } catch (_) {}
+      }
+      isScreenSharing.value = false;
+      if (!Get.testMode) {
+        try {
+          ZegoUIKit().getScreenSharingStateNotifier().removeListener(_onScreenSharingStateChanged);
+          _screenCaptureErrorSubscription?.cancel();
+          _screenCaptureErrorSubscription = null;
+        } catch (_) {}
+      }
       if (isInitialized.value) {
         await ZegoUIKitPrebuiltCallInvitationService().uninit();
         debugPrint('ZegoCallService uninitialized successfully.');
@@ -645,6 +692,131 @@ class ZegoCallService {
       _initializedUserId = null;
       isCalling.value = false;
       activeCallId.value = '';
+    }
+  }
+
+  /// Internal callback invoked when ZEGOCLOUD screen sharing state changes
+  void _onScreenSharingStateChanged() {
+    try {
+      final active = ZegoUIKit().getScreenSharingStateNotifier().value;
+      isScreenSharing.value = active;
+      debugPrint('[ZegoCallService] Screen sharing state updated: $active');
+    } catch (e) {
+      debugPrint('[ZegoCallService] _onScreenSharingStateChanged error: $e');
+    }
+  }
+
+  /// Internal callback for ZEGOCLOUD error events
+  void _onZegoErrorReceived(ZegoUIKitError error) {
+    debugPrint('[ZegoCallService] ZegoUIKit error: code=${error.code}, msg=${error.message}');
+    if (error.code == ZegoUIKitErrorCode.screenCaptureExceptionMediaProjectionPermissionDenied) {
+      isScreenSharing.value = false;
+      Get.snackbar(
+        'Screen Sharing',
+        'Screen sharing permission was cancelled or denied.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.amber.shade900,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+      );
+    } else if (error.code == ZegoUIKitErrorCode.screenCaptureExceptionForegroundServiceFailed) {
+      isScreenSharing.value = false;
+      Get.snackbar(
+        'Screen Sharing Failed',
+        'Foreground service could not start for screen sharing.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade800,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+      );
+    } else if (error.code == ZegoUIKitErrorCode.screenCaptureExceptionAlreadyStarted) {
+      Get.snackbar(
+        'Screen Sharing',
+        'Screen sharing is already active.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.blueGrey.shade800,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+      );
+    } else if (error.code == ZegoUIKitErrorCode.screenCaptureExceptionVideoNotSupported) {
+      isScreenSharing.value = false;
+      Get.snackbar(
+        'Screen Sharing Unsupported',
+        'Screen capture is not supported on this device version.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade800,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+      );
+    } else if (error.code == ZegoUIKitErrorCode.screenCaptureExceptionSystemError) {
+      isScreenSharing.value = false;
+      Get.snackbar(
+        'Screen Sharing Error',
+        'Unable to start screen sharing. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade800,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+      );
+    }
+  }
+
+  /// Start screen sharing in an active call
+  Future<bool> startScreenSharing() async {
+    try {
+      if (isScreenSharing.value) {
+        debugPrint('[ZegoCallService] Screen sharing is already active.');
+        return true;
+      }
+      if (!Get.testMode) {
+        await ZegoUIKit().startSharingScreen();
+      }
+      isScreenSharing.value = true;
+      return true;
+    } catch (e) {
+      debugPrint('[ZegoCallService] startScreenSharing exception: $e');
+      isScreenSharing.value = false;
+      Get.snackbar(
+        'Screen Sharing Error',
+        'Unable to start screen sharing. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade800,
+        colorText: Colors.white,
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+      );
+      return false;
+    }
+  }
+
+  /// Stop screen sharing cleanly without ending the call
+  Future<void> stopScreenSharing() async {
+    try {
+      if (!isScreenSharing.value && (Get.testMode || !ZegoUIKit().getScreenSharingStateNotifier().value)) {
+        isScreenSharing.value = false;
+        return;
+      }
+      if (!Get.testMode) {
+        await ZegoUIKit().stopSharingScreen();
+      }
+    } catch (e) {
+      debugPrint('[ZegoCallService] stopScreenSharing error: $e');
+    } finally {
+      isScreenSharing.value = false;
+    }
+  }
+
+  /// Toggle screen sharing on/off
+  Future<void> toggleScreenSharing() async {
+    if (isScreenSharing.value) {
+      await stopScreenSharing();
+    } else {
+      await startScreenSharing();
     }
   }
 
@@ -1543,6 +1715,35 @@ class ZegoCallService {
         config.turnOnCameraWhenJoining = true;
         config.turnOnMicrophoneWhenJoining = true;
         config.useSpeakerWhenJoining = true;
+        config.screenSharing = ZegoCallScreenSharingConfig(
+          defaultFullScreen: true,
+        );
+        config.bottomMenuBar.maxCount = 5;
+        config.bottomMenuBar.buttons = [
+          ZegoCallMenuBarButtonName.toggleMicrophoneButton,
+          ZegoCallMenuBarButtonName.toggleCameraButton,
+          ZegoCallMenuBarButtonName.toggleScreenSharingButton,
+          ZegoCallMenuBarButtonName.hangUpButton,
+          ZegoCallMenuBarButtonName.switchCameraButton,
+          ZegoCallMenuBarButtonName.switchAudioOutputButton,
+          ZegoCallMenuBarButtonName.showMemberListButton,
+        ];
+        config.foreground = const Stack(
+          children: [
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: EdgeInsets.only(top: 60, right: 16),
+                  child: IgnorePointer(
+                    child: NetworkQualityIndicator(),
+                  ),
+                ),
+              ),
+            ),
+            ScreenSharingIndicator(),
+          ],
+        );
         nav.push(
           MaterialPageRoute(
             builder: (context) => ZegoUIKitPrebuiltCall(
@@ -1627,6 +1828,14 @@ class ZegoCallService {
   }
 
   void _handleCallEndCleanUp(ZegoCallEndEvent event, VoidCallback defaultAction) async {
+    // Ensure screen sharing cleanly stops on call termination
+    if (isScreenSharing.value || ZegoUIKit().getScreenSharingStateNotifier().value) {
+      try {
+        await ZegoUIKit().stopSharingScreen();
+      } catch (_) {}
+    }
+    isScreenSharing.value = false;
+
     final endCallId = activeCallId.value.isNotEmpty
         ? activeCallId.value
         : (_currentSessionCallId ?? ZegoUIKit().getRoom().id);
