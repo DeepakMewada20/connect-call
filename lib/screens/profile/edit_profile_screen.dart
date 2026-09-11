@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/string_utils.dart';
 import 'edit_profile_controller.dart';
 
 class EditProfileScreen extends GetView<EditProfileController> {
@@ -82,9 +83,8 @@ class EditProfileScreen extends GetView<EditProfileController> {
                     NetworkImage(controller.currentUser.profileImage);
               }
 
-              final initial = controller.currentUser.name.isNotEmpty
-                  ? controller.currentUser.name[0].toUpperCase()
-                  : 'U';
+              final initial =
+                  StringUtils.safeInitial(controller.currentUser.name);
 
               return Container(
                 width: 104,

@@ -1,6 +1,7 @@
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart' as ph;
 import '../core/utils/phone_number_util.dart';
+import '../core/utils/string_utils.dart';
 
 /// Lightweight representation of a device contact.
 class DeviceContact {
@@ -113,15 +114,15 @@ class ContactService {
   }) {
     final savedName = getSavedContactName(phoneNumber);
     if (savedName != null && savedName.trim().isNotEmpty) {
-      return savedName.trim();
+      return StringUtils.sanitize(savedName.trim());
     }
     if (registeredName.trim().isNotEmpty) {
-      return registeredName.trim();
+      return StringUtils.sanitize(registeredName.trim());
     }
     if (phoneNumber != null && phoneNumber.trim().isNotEmpty) {
       return PhoneNumberUtil.formatForDisplay(phoneNumber);
     }
-    return fallback;
+    return StringUtils.sanitize(fallback);
   }
 
   /// Fetches raw device contacts with phone numbers and populates cache.
@@ -137,9 +138,10 @@ class ContactService {
       );
 
       result = contacts.map((c) {
-        final name = (c.displayName != null && c.displayName!.isNotEmpty)
+        final rawName = (c.displayName != null && c.displayName!.isNotEmpty)
             ? c.displayName!
             : '${c.name?.first ?? ''} ${c.name?.last ?? ''}'.trim();
+        final name = StringUtils.sanitize(rawName);
         final phones = c.phones.map((p) => p.number).where((p) => p.isNotEmpty).toList();
         return DeviceContact(
           id: c.id,

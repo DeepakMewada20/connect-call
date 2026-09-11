@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:zego_uikit/zego_uikit.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/string_utils.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
@@ -318,7 +319,7 @@ class _InviteParticipantSheetState extends State<InviteParticipantSheet> {
                                       : null,
                                   child: user.profileImage.isEmpty
                                       ? Text(
-                                          user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                          StringUtils.safeInitial(user.name, 'U'),
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,

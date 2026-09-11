@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
+import '../core/utils/string_utils.dart';
 import '../models/user_model.dart';
 
 class UserTile extends StatelessWidget {
@@ -265,8 +266,7 @@ class UserTile extends StatelessWidget {
     final nameForInitial = (displayName != null && displayName!.trim().isNotEmpty)
         ? displayName!.trim()
         : user.name;
-    final String initial =
-        nameForInitial.isNotEmpty ? nameForInitial[0].toUpperCase() : 'U';
+    final String initial = StringUtils.safeInitial(nameForInitial);
     final bool hasImage = user.profileImage.trim().isNotEmpty;
 
     return Stack(

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/phone_number_util.dart';
+import '../../core/utils/string_utils.dart';
 import 'contact_details_controller.dart';
 
 class ContactDetailsScreen extends StatelessWidget {
@@ -300,7 +301,7 @@ class ContactDetailsScreen extends StatelessWidget {
     final user = controller.user.value;
     final name = controller.displayName.value;
     final hasImage = user != null && user.profileImage.trim().isNotEmpty;
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+    final initial = StringUtils.safeInitial(name);
 
     return Container(
       width: 100,

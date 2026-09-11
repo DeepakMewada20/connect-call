@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/string_utils.dart';
 import '../../models/favorite_contact_model.dart';
 import '../../models/user_model.dart';
 import '../../widgets/call_history_tile.dart';
@@ -312,7 +313,7 @@ class HomeScreen extends StatelessWidget {
                     : null,
                 child: fav.avatarUrl.isEmpty
                     ? Text(
-                        fav.name.isNotEmpty ? fav.name[0].toUpperCase() : '?',
+                        StringUtils.safeInitial(fav.name, '?'),
                         style: const TextStyle(
                           color: AppTheme.primaryColor,
                           fontWeight: FontWeight.bold,
@@ -423,7 +424,7 @@ class HomeScreen extends StatelessWidget {
                 : null,
             child: user.profileImage.isEmpty
                 ? Text(
-                    user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                    StringUtils.safeInitial(user.name, '?'),
                     style: const TextStyle(
                       color: AppTheme.primaryColor,
                       fontWeight: FontWeight.bold,

@@ -3,6 +3,7 @@ import '../core/theme/app_theme.dart';
 import '../models/call_model.dart';
 import '../services/auth_service.dart';
 import '../services/contact_service.dart';
+import '../core/utils/string_utils.dart';
 
 /// CallHistoryTile renders a single call record item in the Call History list.
 class CallHistoryTile extends StatelessWidget {
@@ -31,13 +32,13 @@ class CallHistoryTile extends StatelessWidget {
 
     final effectiveUid = currentUserId ?? AuthService().currentUserId;
     final otherRegisteredName = call.getOtherUserName(effectiveUid);
-    final otherName = ContactService.instance.resolveDisplayName(
+    final otherName = StringUtils.sanitize(ContactService.instance.resolveDisplayName(
       phoneNumber: call.phoneNumber,
       registeredName: otherRegisteredName,
       fallback: otherRegisteredName,
-    );
+    ));
     final otherPhoto = call.getOtherUserPhoto(effectiveUid);
-    final initial = otherName.isNotEmpty ? otherName[0].toUpperCase() : 'U';
+    final initial = StringUtils.safeInitial(otherName);
 
     return Material(
       color: cardColor,

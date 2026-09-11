@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/string_utils.dart';
 import '../../models/pending_call_model.dart';
 import '../../services/zego_call_service.dart';
 
@@ -310,7 +311,7 @@ class _IncomingCallDecisionDialogState extends State<IncomingCallDecisionDialog>
                             ),
                             child: Center(
                               child: Text(
-                                callerName.isNotEmpty ? callerName[0].toUpperCase() : 'U',
+                                StringUtils.safeInitial(callerName, 'U'),
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 48,

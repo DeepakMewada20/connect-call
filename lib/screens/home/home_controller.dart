@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/string_utils.dart';
 import '../../models/call_model.dart';
 import '../../models/favorite_contact_model.dart';
 import '../../models/user_model.dart';
@@ -258,7 +259,7 @@ class HomeController extends GetxController {
     return 'User';
   }
 
-  String get userInitial => userName.isNotEmpty ? userName[0].toUpperCase() : 'U';
+  String get userInitial => StringUtils.safeInitial(userName);
 
   // Quick call actions on Home dashboard
   void onAudioCallTap() {

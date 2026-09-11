@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/string_utils.dart';
 import 'profile_controller.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -80,8 +81,7 @@ class ProfileScreen extends StatelessWidget {
     final String displayName =
         currentUser?.name.isNotEmpty == true ? currentUser!.name : 'User';
     final String contactInfo = currentUser?.phoneNumber ?? '';
-    final String initial =
-        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
+    final String initial = StringUtils.safeInitial(displayName);
     final bool isOnline = currentUser?.isOnline ?? false;
     final bool hasImage =
         currentUser?.profileImage.trim().isNotEmpty == true;
