@@ -646,21 +646,14 @@ class ZegoCallService {
             config.turnOnMicrophoneWhenJoining = true;
             config.useSpeakerWhenJoining = true;
 
-            // In 1-on-1 video call, Picture-in-Picture layout displays the remote user fullscreen
-            // with local preview in a corner, avoiding black screen tile issues in gallery layout
-            config.layout = isGroup
-                ? ZegoLayout.gallery(
-                    showNewScreenSharingViewInFullscreenMode: true,
-                    showScreenSharingFullscreenModeToggleButtonRules:
-                        ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
-                  )
-                : ZegoLayout.pictureInPicture(
-                    isSmallViewDraggable: true,
-                    switchLargeOrSmallViewByClick: true,
-                    showNewScreenSharingViewInFullscreenMode: true,
-                    showScreenSharingFullscreenModeToggleButtonRules:
-                        ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
-                  );
+            // Gallery layout is strictly required by ZEGOCLOUD for ZegoScreenSharingView
+            // to mount and render the screen capture stream in fullscreen mode.
+            config.layout = ZegoLayout.gallery(
+              addBorderRadiusAndSpacingBetweenView: false,
+              showNewScreenSharingViewInFullscreenMode: true,
+              showScreenSharingFullscreenModeToggleButtonRules:
+                  ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
+            );
 
             // Screen Sharing configuration
             config.screenSharing = ZegoCallScreenSharingConfig(
@@ -712,7 +705,7 @@ class ZegoCallService {
               ),
             ];
 
-            config.bottomMenuBar.maxCount = 6;
+            config.bottomMenuBar.maxCount = 7;
             config.bottomMenuBar.buttons = [
               ZegoCallMenuBarButtonName.toggleMicrophoneButton,
               ZegoCallMenuBarButtonName.toggleCameraButton,
@@ -1943,9 +1936,11 @@ class ZegoCallService {
         config.turnOnCameraWhenJoining = true;
         config.turnOnMicrophoneWhenJoining = true;
         config.useSpeakerWhenJoining = true;
-        config.layout = ZegoLayout.pictureInPicture(
-          isSmallViewDraggable: true,
-          switchLargeOrSmallViewByClick: true,
+        config.layout = ZegoLayout.gallery(
+          addBorderRadiusAndSpacingBetweenView: false,
+          showNewScreenSharingViewInFullscreenMode: true,
+          showScreenSharingFullscreenModeToggleButtonRules:
+              ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
         );
         config.audioVideoView.useVideoViewAspectFill = true;
         config.audioVideoView.showCameraStateOnView = true;
@@ -1954,7 +1949,7 @@ class ZegoCallService {
         config.screenSharing = ZegoCallScreenSharingConfig(
           defaultFullScreen: true,
         );
-        config.bottomMenuBar.maxCount = 6;
+        config.bottomMenuBar.maxCount = 7;
         config.bottomMenuBar.buttons = [
           ZegoCallMenuBarButtonName.toggleMicrophoneButton,
           ZegoCallMenuBarButtonName.toggleCameraButton,
