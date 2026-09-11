@@ -117,11 +117,18 @@ class FcmService {
         sound: true,
       );
 
-      // 3. Obtain initial token and sync if user is currently logged in
+      // 3. Force-delete stale token and get a fresh one to prevent NotRegistered errors.
+      // This is critical after app reinstall or OS FCM token rotation.
+      try {
+        await _messaging.deleteToken();
+        debugPrint('[FCM] Deleted old FCM token to force fresh registration.');
+      } catch (e) {
+        debugPrint('[FCM] deleteToken skipped: $e');
+      }
       final token = await _messaging.getToken();
       if (token != null) {
         _cachedFcmToken = token;
-        debugPrint('[FCM] Token received: ${token.substring(0, token.length > 10 ? 10 : token.length)}...');
+        debugPrint('[FCM] Fresh token received: ${token.substring(0, token.length > 10 ? 10 : token.length)}...');
         await syncFcmToken(token);
       }
 

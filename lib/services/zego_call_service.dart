@@ -21,7 +21,6 @@ import '../screens/calling/invite_participant_sheet.dart';
 import '../screens/calling/screen_sharing_indicator.dart';
 import '../screens/home/home_controller.dart';
 // ignore: implementation_imports
-import 'package:zego_uikit/src/services/internal/internal.dart';
 import '../widgets/network_quality_indicator.dart';
 import 'auth_service.dart';
 import 'block_service.dart';
@@ -868,12 +867,10 @@ class ZegoCallService {
         return true;
       }
       if (!Get.testMode) {
-        // Prevent ZegoUIKit's buggy double-start on Android 14+ that cancels MediaProjection token
-        try {
-          ZegoUIKitCore.shared.coreData.isFirstScreenSharing = false;
-        } catch (e) {
-          debugPrint('[ZegoCallService] isFirstScreenSharing override error: $e');
-        }
+        // NOTE: Do NOT set isFirstScreenSharing = false.
+        // The Zego SDK intentionally uses isFirstScreenSharing on Android to
+        // trigger a stop→start cycle that properly acquires the MediaProjection
+        // token. Overriding it breaks screen sharing on Android 14+.
         await ZegoUIKit().startSharingScreen();
       }
       isScreenSharing.value = true;
