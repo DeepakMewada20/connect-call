@@ -8,12 +8,15 @@
 [![Backend](https://img.shields.io/badge/Backend-Firebase%20%2B%20Cloud%20Functions-yellow.svg)](https://firebase.google.com)
 [![Tests](https://img.shields.io/badge/Tests-201%20Passed-brightgreen.svg)](test/)
 
-> **🔗 Source Code Repository & Clone Link:**
-> You can clone the complete source code directly from GitHub:
+> **🔗 Quick Links & Downloads:**
+> - **📦 Download Release APK:** [Google Drive Link](https://drive.google.com/file/d/1IpPCFl5rQ7Rj909WGUB5ZzT8LtQHCEdK/view?usp=drive_link)
+> - **🎥 Video Walkthrough Demo:** [Watch on Google Drive](https://drive.google.com/file/d/1Z3ElECZ7K0cbYEhzUJpY8oFkJEmzoB5C/view?usp=drive_link)
+> - **💻 Source Code Repository:** [https://github.com/DeepakMewada20/connect-call.git](https://github.com/DeepakMewada20/connect-call.git)
+> 
 > ```bash
+> # Clone the complete repository:
 > git clone https://github.com/DeepakMewada20/connect-call.git
 > ```
-> **GitHub Link:** [https://github.com/DeepakMewada20/connect-call.git](https://github.com/DeepakMewada20/connect-call.git)
 
 **ConnectCall** is a modern, enterprise-ready real-time communication application built with **Flutter**, **Firebase**, and **ZEGOCLOUD**. It features 1-to-1 and multi-party HD voice/video calling, real-time in-call screen sharing, background/terminated push notification waking via FCM, intelligent device contact synchronization with UTF-16 emoji-safe display resolution, and offline-first local SQLite call history persistence.
 
