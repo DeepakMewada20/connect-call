@@ -27,7 +27,7 @@ class _ScreenSharingIndicatorState extends State<ScreenSharingIndicator>
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
+    );
     _pulseAnim = Tween<double>(begin: 0.4, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
@@ -44,7 +44,14 @@ class _ScreenSharingIndicatorState extends State<ScreenSharingIndicator>
     return Obx(() {
       final isSharing = ZegoCallService.instance.isScreenSharing.value;
       if (!isSharing) {
+        if (_animController.isAnimating) {
+          _animController.stop();
+        }
         return const SizedBox.shrink();
+      }
+
+      if (!_animController.isAnimating) {
+        _animController.repeat(reverse: true);
       }
 
       return SafeArea(

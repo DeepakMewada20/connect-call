@@ -21,6 +21,7 @@ import '../screens/calling/invite_participant_sheet.dart';
 import '../screens/calling/screen_sharing_indicator.dart';
 import '../screens/home/home_controller.dart';
 // ignore: implementation_imports
+import 'package:zego_uikit/src/services/internal/internal.dart';
 import '../widgets/network_quality_indicator.dart';
 import 'auth_service.dart';
 import 'block_service.dart';
@@ -656,6 +657,9 @@ class ZegoCallService {
                 : ZegoLayout.pictureInPicture(
                     isSmallViewDraggable: true,
                     switchLargeOrSmallViewByClick: true,
+                    showNewScreenSharingViewInFullscreenMode: true,
+                    showScreenSharingFullscreenModeToggleButtonRules:
+                        ZegoShowFullscreenModeToggleButtonRules.alwaysShow,
                   );
 
             // Screen Sharing configuration
@@ -878,10 +882,13 @@ class ZegoCallService {
         return true;
       }
       if (!Get.testMode) {
-        // NOTE: Do NOT set isFirstScreenSharing = false.
-        // The Zego SDK intentionally uses isFirstScreenSharing on Android to
-        // trigger a stop→start cycle that properly acquires the MediaProjection
-        // token. Overriding it breaks screen sharing on Android 14+.
+        // Prevent ZegoUIKit's buggy double-start cycle on Android that immediately
+        // stops and destroys the screen capture source while the system dialog is open.
+        try {
+          ZegoUIKitCore.shared.coreData.isFirstScreenSharing = false;
+        } catch (e) {
+          debugPrint('[ZegoCallService] isFirstScreenSharing override error: $e');
+        }
         await ZegoUIKit().startSharingScreen();
       }
       isScreenSharing.value = true;
