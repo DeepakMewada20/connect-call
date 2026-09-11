@@ -27,3 +27,12 @@ plugins {
 }
 
 include(":app")
+
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        // Required for ZEGOCLOUD zpns-fcm push notification client
+        maven { url = uri("https://storage.zego.im/maven") }
+    }
+}

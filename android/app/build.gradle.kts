@@ -50,4 +50,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // ZEGOCLOUD ZPNs FCM push client — provides FCMPushClient used by the ZPNs SDK
+    // Without this, ClassNotFoundException: im.zego.zpns_android_plugin_fcm.FCMPushClient
+    implementation("im.zego:zpns-fcm:2.8.1")
 }
