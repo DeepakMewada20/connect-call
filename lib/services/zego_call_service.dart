@@ -211,6 +211,17 @@ class ZegoCallService {
             onlyInitiatorCanInvite: false,
           ),
         ),
+        notificationConfig: ZegoCallInvitationNotificationConfig(
+          androidNotificationConfig: ZegoCallAndroidNotificationConfig(
+            callChannel: ZegoCallAndroidNotificationChannelConfig(
+              channelID: 'incoming_calls_v2',
+              channelName: 'Incoming Calls',
+              icon: 'ic_launcher',
+              vibrate: true,
+            ),
+            showOnFullScreen: true,
+          ),
+        ),
         uiConfig: ZegoCallInvitationUIConfig(
           inviter: ZegoCallInvitationInviterUIConfig(
             defaultCameraOn: true,

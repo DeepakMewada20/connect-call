@@ -49,10 +49,7 @@ class NetworkQualityIndicator extends StatelessWidget {
               ),
           ],
         ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: _buildContent(quality),
-        ),
+        child: _buildContent(quality),
       );
     });
   }
@@ -61,7 +58,6 @@ class NetworkQualityIndicator extends StatelessWidget {
     if (quality == null) {
       // Safe initial state: neutral indicator while awaiting first RTC packet
       return const Row(
-        key: ValueKey('connecting_state'),
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
@@ -83,7 +79,6 @@ class NetworkQualityIndicator extends StatelessWidget {
     }
 
     return Row(
-      key: ValueKey(quality),
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
