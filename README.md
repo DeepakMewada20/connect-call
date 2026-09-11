@@ -1,11 +1,19 @@
 # 📞 ConnectCall — Enterprise-Grade Audio/Video Calling & Screen Sharing App
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?style=flat&logo=github&logoColor=white)](https://github.com/DeepakMewada20/connect-call.git)
 [![Flutter](https://img.shields.io/badge/Flutter-3.29%2B-blue.svg)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.12%2B-blue.svg)](https://dart.dev)
 [![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2F%20GetX-green.svg)](https://pub.dev/packages/get)
 [![Calling SDK](https://img.shields.io/badge/Calling-ZEGOCLOUD%20UIKit-orange.svg)](https://www.zegocloud.com)
 [![Backend](https://img.shields.io/badge/Backend-Firebase%20%2B%20Cloud%20Functions-yellow.svg)](https://firebase.google.com)
 [![Tests](https://img.shields.io/badge/Tests-201%20Passed-brightgreen.svg)](test/)
+
+> **🔗 Source Code Repository & Clone Link:**
+> You can clone the complete source code directly from GitHub:
+> ```bash
+> git clone https://github.com/DeepakMewada20/connect-call.git
+> ```
+> **GitHub Link:** [https://github.com/DeepakMewada20/connect-call.git](https://github.com/DeepakMewada20/connect-call.git)
 
 **ConnectCall** is a modern, enterprise-ready real-time communication application built with **Flutter**, **Firebase**, and **ZEGOCLOUD**. It features 1-to-1 and multi-party HD voice/video calling, real-time in-call screen sharing, background/terminated push notification waking via FCM, intelligent device contact synchronization with UTF-16 emoji-safe display resolution, and offline-first local SQLite call history persistence.
 
