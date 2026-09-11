@@ -144,9 +144,13 @@ export const sendCallNotification = onCall(
       const now = Date.now();
       const expiresAt = now + 60000; // 60s TTL
 
-      // 3. Construct high-priority FCM data message
+      // 3. Construct high-priority FCM message with notification block for terminated state fallback
       const message: admin.messaging.Message = {
         token: fcmToken,
+        notification: {
+          title: `Incoming ${callType === "video" ? "Video" : "Audio"} Call`,
+          body: `${callerName || "User"} is calling you...`,
+        },
         data: {
           type: "incoming_call",
           callId: String(callId),
@@ -161,6 +165,13 @@ export const sendCallNotification = onCall(
         android: {
           priority: "high",
           ttl: 60 * 1000,
+          notification: {
+            channelId: "incoming_calls_v2",
+            sound: "call_ringtone",
+            priority: "max",
+            defaultSound: false,
+            visibility: "public",
+          },
         },
       };
 

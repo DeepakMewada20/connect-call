@@ -159,14 +159,21 @@ class _IncomingCallDecisionDialogState extends State<IncomingCallDecisionDialog>
     IncomingCallDecisionDialog._activeCallId = null;
     IncomingCallDecisionDialog._activeDialogContext = null;
 
-    // Ensure camera and microphone permissions are granted before call screen mounts
-    // so Android does not pause the Flutter activity or drop the camera hardware session
+    // Ensure camera and microphone permissions are granted before call screen mounts.
+    // Avoid re-requesting if already granted to prevent camera hardware lock on Vivo/OEM devices.
     if (!Get.testMode) {
       try {
         if (widget.pendingCall.isVideo) {
-          await [Permission.camera, Permission.microphone].request();
+          final cameraGranted = await Permission.camera.isGranted;
+          final micGranted = await Permission.microphone.isGranted;
+          if (!cameraGranted || !micGranted) {
+            await [Permission.camera, Permission.microphone].request();
+          }
         } else {
-          await Permission.microphone.request();
+          final micGranted = await Permission.microphone.isGranted;
+          if (!micGranted) {
+            await Permission.microphone.request();
+          }
         }
       } catch (e) {
         debugPrint('[IncomingCallDecisionDialog] Permission request error: $e');

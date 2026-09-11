@@ -422,6 +422,14 @@ class ZegoCallService {
                   if (!accepted) {
                     await acceptCallFromNotification(pendingCall);
                   }
+                  if (pendingCall.isVideo) {
+                    Future.delayed(const Duration(milliseconds: 700), () {
+                      try {
+                        ZegoUIKit().turnCameraOn(true);
+                        debugPrint('[ZegoCallService] Auto-recovered camera after dialog accept.');
+                      } catch (_) {}
+                    });
+                  }
                 },
                 onReject: () async {
                   try {
@@ -457,6 +465,14 @@ class ZegoCallService {
                 callId: targetCallId,
                 status: 'connected',
               );
+            }
+            if (_currentSessionIsVideo) {
+              Future.delayed(const Duration(milliseconds: 700), () {
+                try {
+                  ZegoUIKit().turnCameraOn(true);
+                  debugPrint('[ZegoCallService] Auto-recovered camera after accept button press.');
+                } catch (_) {}
+              });
             }
           },
           onOutgoingCallDeclined: (callID, callee, customData) async {
@@ -1763,13 +1779,20 @@ class ZegoCallService {
       }
     }
 
-    // Ensure permissions are acquired before entering room
+    // Ensure permissions are acquired before entering room without redundant re-requesting
     if (!Get.testMode) {
       try {
         if (call.isVideo) {
-          await [Permission.camera, Permission.microphone].request();
+          final cameraGranted = await Permission.camera.isGranted;
+          final micGranted = await Permission.microphone.isGranted;
+          if (!cameraGranted || !micGranted) {
+            await [Permission.camera, Permission.microphone].request();
+          }
         } else {
-          await Permission.microphone.request();
+          final micGranted = await Permission.microphone.isGranted;
+          if (!micGranted) {
+            await Permission.microphone.request();
+          }
         }
       } catch (e) {
         debugPrint('[CALL PUSH] Permission request error: $e');
@@ -1858,6 +1881,14 @@ class ZegoCallService {
     // the call room and presents the prebuilt call screen via requireConfig!
     if (acceptedByZego) {
       debugPrint('[CALL PUSH] Call connected via ZEGOCLOUD invitation service. Skipping manual navigation.');
+      if (call.isVideo) {
+        Future.delayed(const Duration(milliseconds: 700), () {
+          try {
+            ZegoUIKit().turnCameraOn(true);
+            debugPrint('[ZegoCallService] Auto-recovered camera after notification accept.');
+          } catch (_) {}
+        });
+      }
       return;
     }
 

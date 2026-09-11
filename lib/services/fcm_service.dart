@@ -7,6 +7,9 @@ import '../screens/calling/incoming_call_decision_dialog.dart';
 import 'auth_service.dart';
 import 'call_notification_service.dart';
 import 'pending_call_manager.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/widgets.dart';
+import '../firebase_options.dart';
 import 'zego_call_service.dart';
 
 typedef FcmTokenSyncDelegate = Future<void> Function(String uid, String token);
@@ -15,6 +18,17 @@ typedef FcmTokenCleanDelegate = Future<void> Function(String uid);
 /// Top-level background message handler for FCM
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } catch (e) {
+    debugPrint('[FCM] Background binding/firebase init note: $e');
+  }
+
   debugPrint('[FCM] Background push received: ${message.data}');
   final data = message.data;
   final type = data['type'] as String?;
