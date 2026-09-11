@@ -9,7 +9,6 @@
 [![Tests](https://img.shields.io/badge/Tests-201%20Passed-brightgreen.svg)](test/)
 
 > **🔗 Quick Links & Downloads:**
-> - **📦 Download Release APK:** [Google Drive Link](https://drive.google.com/file/d/1IpPCFl5rQ7Rj909WGUB5ZzT8LtQHCEdK/view?usp=drive_link)
 > - **🎥 Video Walkthrough Demo:** [Watch on Google Drive](https://drive.google.com/file/d/1Z3ElECZ7K0cbYEhzUJpY8oFkJEmzoB5C/view?usp=drive_link)
 > - **💻 Source Code Repository:** [https://github.com/DeepakMewada20/connect-call.git](https://github.com/DeepakMewada20/connect-call.git)
 > 
